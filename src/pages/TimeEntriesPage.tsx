@@ -14,8 +14,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Calendar as CalendarIcon, Plus, Trash2 } from 'lucide-react';
-import { Tables, TablesInsert } from '@/integrations/supabase/types';
+import { Calendar as CalendarIcon, Plus, Trash2, CheckCircle2 } from 'lucide-react';
+import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 // Define the form schema based on the time_entries table
 const timeEntrySchema = z.object({
@@ -80,7 +80,8 @@ const TimeEntriesPage = () => {
         .from('time_entries')
         .select('*')
         .eq('employee_id', employeeId)
-        .order('entry_date', { ascending: false });
+        .order('entry_date', { ascending: false })
+        .order('created_at', { ascending: false }); // Secondary sort for consistent ordering
       if (error) throw new Error(error.message);
       return data || [];
     },
@@ -123,14 +124,42 @@ const TimeEntriesPage = () => {
     },
   });
 
-  // Mutation to delete a time entry
-  const deleteTimeEntryMutation = useMutation<string, Error, string>({ // TData is string (entryId)
+  // Mutation to submit a time entry
+  const submitTimeEntryMutation = useMutation<TimeEntry, Error, string>({
     mutationFn: async (entryId) => {
+      const updates: TablesUpdate<'time_entries'> = {
+        is_finalized: true,
+        submitted_at: new Date().toISOString(),
+      };
+      const { data, error } = await supabase
+        .from('time_entries')
+        .update(updates)
+        .eq('id', entryId)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error("Failed to submit time entry: no data returned.");
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['timeEntries', employeeId] });
+      toast.success('Time entry submitted successfully!');
+    },
+    onError: (error) => {
+      toast.error(`Failed to submit time entry: ${error.message}`);
+    },
+  });
+
+  // Mutation to delete a time entry
+  const deleteTimeEntryMutation = useMutation<string, Error, string>({
+    mutationFn: async (entryId) => {
+      // Optionally, add a check here to prevent deleting finalized entries from the backend
+      // For now, UI will prevent this.
       const { error } = await supabase.from('time_entries').delete().eq('id', entryId);
       if (error) throw new Error(error.message);
-      return entryId; // Return entryId on success
+      return entryId;
     },
-    onSuccess: () => { // entryId is the first argument to onSuccess
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['timeEntries', employeeId] });
       toast.success(`Time entry deleted successfully!`);
     },
@@ -138,7 +167,6 @@ const TimeEntriesPage = () => {
       toast.error(`Failed to delete time entry: ${error.message}`);
     }
   });
-
 
   const onSubmit = (values: TimeEntryFormValues) => {
     if (!employeeId) {
@@ -176,7 +204,7 @@ const TimeEntriesPage = () => {
       <Card>
         <CardHeader>
           <CardTitle>Add New Time Entry</CardTitle>
-          <CardDescription>Fill in the details below to log your time.</CardDescription>
+          <CardDescription>Fill in the details below to log your time. Entries are saved as drafts until submitted.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -253,7 +281,7 @@ const TimeEntriesPage = () => {
                 )}
               />
               <Button type="submit" disabled={addTimeEntryMutation.isPending}>
-                <Plus className="mr-2 h-4 w-4" /> {addTimeEntryMutation.isPending ? 'Adding...' : 'Add Entry'}
+                <Plus className="mr-2 h-4 w-4" /> {addTimeEntryMutation.isPending ? 'Adding...' : 'Add Entry as Draft'}
               </Button>
             </form>
           </Form>
@@ -263,6 +291,7 @@ const TimeEntriesPage = () => {
       <Card>
         <CardHeader>
           <CardTitle>Your Time Entries</CardTitle>
+          <CardDescription>Manage your draft and submitted time entries.</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoadingEntries && <p>Loading entries...</p>}
@@ -272,20 +301,48 @@ const TimeEntriesPage = () => {
           {!isLoadingEntries && timeEntries && timeEntries.length > 0 && (
             <ul className="space-y-4">
               {timeEntries.map((entry) => (
-                <li key={entry.id} className="p-4 border rounded-md flex justify-between items-center">
+                <li key={entry.id} className={`p-4 border rounded-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${entry.is_finalized ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
                   <div>
-                    <p className="font-semibold">Project: {entry.project_code} ({format(new Date(entry.entry_date), "PPP")})</p>
-                    <p>Hours: {entry.hours_worked}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold">Project: {entry.project_code}</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${entry.is_finalized ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                        {entry.is_finalized ? 'Submitted' : 'Draft'}
+                      </span>
+                    </div>
+                    <p className="text-sm">Date: {format(new Date(entry.entry_date), "PPP")}</p>
+                    <p className="text-sm">Hours: {entry.hours_worked}</p>
                     {entry.notes && <p className="text-sm text-muted-foreground">Notes: {entry.notes}</p>}
+                    {entry.is_finalized && entry.submitted_at && (
+                      <p className="text-xs text-gray-500">Submitted on: {format(new Date(entry.submitted_at), "PPP p")}</p>
+                    )}
                   </div>
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
-                    onClick={() => deleteTimeEntryMutation.mutate(entry.id)}
-                    disabled={deleteTimeEntryMutation.isPending && deleteTimeEntryMutation.variables === entry.id}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex space-x-2 self-start sm:self-center">
+                    {!entry.is_finalized && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => submitTimeEntryMutation.mutate(entry.id)}
+                          disabled={submitTimeEntryMutation.isPending && submitTimeEntryMutation.variables === entry.id}
+                        >
+                          <CheckCircle2 className="mr-1 h-4 w-4" />
+                          {submitTimeEntryMutation.isPending && submitTimeEntryMutation.variables === entry.id ? 'Submitting...' : 'Submit'}
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => deleteTimeEntryMutation.mutate(entry.id)}
+                          disabled={deleteTimeEntryMutation.isPending && deleteTimeEntryMutation.variables === entry.id}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                    {/* Placeholder for "Request Edit" for submitted entries */}
+                    {entry.is_finalized && (
+                       <p className="text-xs text-gray-500 italic mt-1">Entry submitted. Contact supervisor for changes.</p>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
