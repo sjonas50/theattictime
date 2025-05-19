@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,8 +14,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Calendar as CalendarIcon, Plus, Trash2 } from 'lucide-react'; // Using Calendar alias for icon
-import { Tables } from '@/integrations/supabase/types'; // Import Tables type
+import { Calendar as CalendarIcon, Plus, Trash2 } from 'lucide-react';
+import { Tables, TablesInsert } from '@/integrations/supabase/types';
 
 // Define the form schema based on the time_entries table
 const timeEntrySchema = z.object({
@@ -28,6 +27,14 @@ const timeEntrySchema = z.object({
 
 type TimeEntryFormValues = z.infer<typeof timeEntrySchema>;
 type TimeEntry = Tables<'time_entries'>;
+
+// Define the specific shape of data passed to the addTimeEntryMutation
+type AddTimeEntryVariables = {
+  project_code: string;
+  hours_worked: number;
+  notes?: string;
+  entry_date: string; // Formatted as yyyy-MM-dd
+};
 
 const TimeEntriesPage = () => {
   const { user } = useAuth();
@@ -77,24 +84,34 @@ const TimeEntriesPage = () => {
       if (error) throw new Error(error.message);
       return data || [];
     },
-    enabled: !!employeeId, // Only run query if employeeId is available
+    enabled: !!employeeId,
   });
 
   // Mutation to add a new time entry
-  const addTimeEntryMutation = useMutation<TimeEntry, Error, Omit<Tables<'time_entries', 'Insert'>, 'employee_id' | 'id' | 'created_at' | 'updated_at' | 'is_finalized'> & { entry_date: string }>({
+  const addTimeEntryMutation = useMutation<TimeEntry, Error, AddTimeEntryVariables>({
     mutationFn: async (newEntryData) => {
       if (!employeeId) throw new Error("Employee ID not found.");
       
-      const entryToInsert: Tables<'time_entries', 'Insert'> = {
-        ...newEntryData,
+      const entryToInsert: TablesInsert<'time_entries'> = {
+        project_code: newEntryData.project_code,
+        hours_worked: newEntryData.hours_worked,
+        notes: newEntryData.notes, // notes can be undefined, Supabase client handles this
+        entry_date: newEntryData.entry_date,
         employee_id: employeeId,
         is_finalized: false, // Default value
+        // Other optional fields (approved_at, etc.) default to undefined
       };
       
-      // @ts-ignore - supabase types might not perfectly align with our mutation input here, ensure it's correct
-      const { data, error } = await supabase.from('time_entries').insert(entryToInsert).select().single();
+      const { data, error } = await supabase
+        .from('time_entries')
+        .insert(entryToInsert)
+        .select('*') // Explicitly select all columns to ensure correct return type
+        .single();
+
       if (error) throw new Error(error.message);
-      return data as TimeEntry;
+      if (!data) throw new Error("Failed to create time entry: no data returned."); // Ensure data is not null
+
+      return data; // data is now correctly typed as TimeEntry (Tables<'time_entries', 'Row'>)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['timeEntries', employeeId] });
@@ -107,13 +124,13 @@ const TimeEntriesPage = () => {
   });
 
   // Mutation to delete a time entry
-  const deleteTimeEntryMutation = useMutation<any, Error, string>({
+  const deleteTimeEntryMutation = useMutation<string, Error, string>({ // TData is string (entryId)
     mutationFn: async (entryId) => {
       const { error } = await supabase.from('time_entries').delete().eq('id', entryId);
       if (error) throw new Error(error.message);
-      return entryId;
+      return entryId; // Return entryId on success
     },
-    onSuccess: (entryId) => {
+    onSuccess: () => { // entryId is the first argument to onSuccess
       queryClient.invalidateQueries({ queryKey: ['timeEntries', employeeId] });
       toast.success(`Time entry deleted successfully!`);
     },
@@ -128,10 +145,15 @@ const TimeEntriesPage = () => {
       toast.error("Cannot submit entry: Employee details not found.");
       return;
     }
-    addTimeEntryMutation.mutate({
-      ...values,
-      entry_date: format(values.entry_date, 'yyyy-MM-dd'), // Format date for Supabase
-    });
+    const payload: AddTimeEntryVariables = {
+      project_code: values.project_code,
+      hours_worked: values.hours_worked,
+      entry_date: format(values.entry_date, 'yyyy-MM-dd'),
+    };
+    if (values.notes && values.notes.trim() !== '') { // Only include notes if present and not empty
+      payload.notes = values.notes;
+    }
+    addTimeEntryMutation.mutate(payload);
   };
 
   if (!user) {
@@ -275,4 +297,3 @@ const TimeEntriesPage = () => {
 };
 
 export default TimeEntriesPage;
-
