@@ -82,7 +82,7 @@ serve(async (req: Request) => {
       // 3. Send email using Resend
       emailPromises.push(
         resend.emails.send({
-          from: "Timesheet System <onboarding@resend.dev>", // Replace with your desired sender email
+          from: "Timesheet System <steve@theattic.ai>", // Updated from email address
           to: [employeeEmail],
           subject: "Friendly Reminder: Please Submit Your Timesheet",
           html: `
@@ -121,3 +121,4 @@ serve(async (req: Request) => {
     });
   }
 });
+
