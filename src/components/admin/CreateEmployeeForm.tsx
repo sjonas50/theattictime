@@ -11,7 +11,8 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 
 const employeeFormSchema = z.object({
-  userId: z.string().uuid({ message: "Must be a valid User ID (UUID format)." }),
+  email: z.string().email({ message: "Please enter a valid email address." }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   employeeIdInternal: z.string().min(1, { message: "Internal Employee ID is required." }),
 });
@@ -23,7 +24,8 @@ const CreateEmployeeForm = () => {
   const form = useForm<EmployeeFormValues>({
     resolver: zodResolver(employeeFormSchema),
     defaultValues: {
-      userId: '',
+      email: '',
+      password: '',
       name: '',
       employeeIdInternal: '',
     },
@@ -31,57 +33,45 @@ const CreateEmployeeForm = () => {
 
   const onSubmit = async (values: EmployeeFormValues) => {
     try {
-      // Check if user_id exists in auth.users - This is a client-side check limitation.
-      // A proper check would be an edge function or ensuring UUIDs are sourced correctly.
-      // For now, we proceed assuming the admin provides a valid auth.user.id.
-
-      const { data: employeeData, error: employeeError } = await supabase
-        .from('employees')
-        .insert([
-          {
-            user_id: values.userId,
-            name: values.name,
-            employee_id_internal: values.employeeIdInternal,
-          },
-        ])
-        .select()
-        .single();
-
-      if (employeeError) throw employeeError;
-
-      if (employeeData) {
-        // Assign default 'employee' role
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .insert({ user_id: values.userId, role: 'employee' });
-
-        if (roleError) {
-          // Log role error, but employee creation was successful
-          console.warn('Employee created, but failed to assign default role:', roleError);
-          toast.warning(`Employee ${values.name} created, but failed to assign default 'employee' role. Please assign manually.`);
-        } else {
-          toast.success(`Employee ${values.name} created and 'employee' role assigned.`);
+      const { data: functionData, error: functionError } = await supabase.functions.invoke('create-user-and-employee', {
+        body: {
+          email: values.email,
+          password: values.password,
+          name: values.name,
+          employeeIdInternal: values.employeeIdInternal,
         }
+      });
+
+      if (functionError) {
+        // Handle potential network errors or if function itself crashes before returning structured error
+        console.error('Error invoking edge function:', functionError);
+        toast.error(`Failed to create employee: ${functionError.message}`);
+        return;
       }
-      
-      form.reset();
-      queryClient.invalidateQueries({ queryKey: ['employees_admin'] });
-      queryClient.invalidateQueries({ queryKey: ['user_roles_admin'] });
+
+      // Edge function is expected to return JSON, data could be the parsed JSON or an error object from the function
+      const responseData = functionData; // supabase.functions.invoke already parses JSON if Content-Type is application/json
+
+      if (responseData && responseData.error) {
+        // Error explicitly returned by the edge function
+        console.error('Error from edge function:', responseData.error);
+        toast.error(`Failed to create employee: ${responseData.error}`);
+      } else if (responseData && responseData.message) {
+        toast.success(responseData.message);
+        form.reset();
+        queryClient.invalidateQueries({ queryKey: ['employees_admin'] });
+        queryClient.invalidateQueries({ queryKey: ['user_roles_admin'] });
+        // Potentially invalidate auth users list if that's displayed anywhere admin can see
+      } else {
+        // Fallback for unexpected response structure
+        console.error('Unexpected response from edge function:', responseData);
+        toast.error('An unexpected error occurred while creating the employee.');
+      }
+
     } catch (error: any) {
-      console.error('Error creating employee:', error);
-      // Check for unique constraint violation for user_id in employees table
-      if (error.code === '23505' && error.message.includes('employees_user_id_key')) {
-        toast.error('Error: This User ID is already associated with an employee.');
-      } else if (error.code === '23503' && error.message.includes('employees_user_id_fkey')) {
-        // This error means the user_id does not exist in auth.users
-        // However, Supabase might not return this specific error if RLS prevents the check or if FK is not to auth.users directly.
-        // The employees.user_id does not have a direct FK to auth.users in the provided schema.
-        // This message is a placeholder for a more robust check.
-        toast.error('Error: The provided User ID does not exist or is invalid.');
-      }
-      else {
-        toast.error(`Failed to create employee: ${error.message}`);
-      }
+      // Catch-all for other unexpected errors during the process
+      console.error('Error creating employee (client-side catch):', error);
+      toast.error(`Failed to create employee: ${error.message || 'An unknown error occurred.'}`);
     }
   };
 
@@ -90,12 +80,25 @@ const CreateEmployeeForm = () => {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField
           control={form.control}
-          name="userId"
+          name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>User ID (Auth User UUID)</FormLabel>
+              <FormLabel>User Email</FormLabel>
               <FormControl>
-                <Input placeholder="Enter the user's auth.uid()" {...field} />
+                <Input type="email" placeholder="Enter user's email" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="password"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Password</FormLabel>
+              <FormControl>
+                <Input type="password" placeholder="Enter a temporary password" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -128,7 +131,7 @@ const CreateEmployeeForm = () => {
           )}
         />
         <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? 'Creating...' : 'Create Employee'}
+          {form.formState.isSubmitting ? 'Creating...' : 'Create Employee & User Account'}
         </Button>
       </form>
     </Form>

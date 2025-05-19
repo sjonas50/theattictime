@@ -1,1 +1,5 @@
-project_id = "mpbwlrpzltkhagzgkbxn"
+
+project_id = "mpbwlrpzltkhagzgkbxn" # Do not change this line
+
+[functions.create-user-and-employee]
+  verify_jwt = true # Ensures only authenticated users (like an admin) can call this.

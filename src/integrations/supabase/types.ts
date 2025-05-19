@@ -15,6 +15,7 @@ export type Database = {
           employee_id_internal: string
           id: string
           name: string
+          supervisor_id: string | null
           updated_at: string
           user_id: string
         }
@@ -23,6 +24,7 @@ export type Database = {
           employee_id_internal: string
           id?: string
           name: string
+          supervisor_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -31,10 +33,19 @@ export type Database = {
           employee_id_internal?: string
           id?: string
           name?: string
+          supervisor_id?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "employees_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       time_entries: {
         Row: {

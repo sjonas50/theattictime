@@ -1,0 +1,126 @@
+
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { corsHeaders } from '../_shared/cors.ts';
+
+console.log("Create User and Employee Edge Function initializing");
+
+serve(async (req: Request) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const body = await req.json();
+    const { email, password, name, employeeIdInternal } = body;
+
+    console.log("Received request to create user and employee:", { email, name, employeeIdInternal });
+
+    if (!email || !password || !name || !employeeIdInternal) {
+      console.log("Missing required fields");
+      return new Response(JSON.stringify({ error: 'Missing required fields: email, password, name, and employeeIdInternal are required.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
+    }
+
+    // Ensure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are available
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('Supabase URL or Service Role Key is not configured in environment variables.');
+      return new Response(JSON.stringify({ error: 'Server configuration error.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      });
+    }
+    
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+
+    // 1. Create the user in auth.users
+    console.log(`Attempting to create auth user for: ${email}`);
+    const { data: authUserResponse, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email: email,
+      password: password,
+      email_confirm: true, // Set to true so users need to confirm. Or false for auto-confirmation.
+    });
+
+    if (authError) {
+      console.error('Error creating auth user:', authError.message);
+      if (authError.message.includes('User already registered') || (authError as any).status === 422) { // Supabase might return 422 for already registered
+        return new Response(JSON.stringify({ error: 'A user with this email already exists.' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 409, // Conflict
+        });
+      }
+      return new Response(JSON.stringify({ error: `Failed to create auth user: ${authError.message}` }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      });
+    }
+
+    const newUserId = authUserResponse.user.id;
+    console.log(`Auth user created successfully: ${newUserId} for email: ${email}`);
+
+    // 2. Create the employee record in public.employees
+    console.log(`Attempting to create employee record for user ID: ${newUserId}`);
+    const { data: employeeData, error: employeeError } = await supabaseAdmin
+      .from('employees')
+      .insert({
+        user_id: newUserId,
+        name: name,
+        employee_id_internal: employeeIdInternal,
+      })
+      .select()
+      .single();
+
+    if (employeeError) {
+      console.error('Error creating employee record:', employeeError.message);
+      // Attempt to delete the auth user if employee creation fails (rollback)
+      console.log(`Attempting to roll back auth user creation for ID: ${newUserId}`);
+      const { error: deleteUserError } = await supabaseAdmin.auth.admin.deleteUser(newUserId);
+      if (deleteUserError) {
+        console.error('Failed to roll back auth user:', deleteUserError.message);
+      } else {
+        console.log('Rolled back auth user creation successfully.');
+      }
+      return new Response(JSON.stringify({ error: `Failed to create employee record: ${employeeError.message}` }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      });
+    }
+    console.log(`Employee record created successfully for user ID: ${newUserId}`, employeeData);
+
+    // 3. Assign default 'employee' role in public.user_roles
+    console.log(`Attempting to assign 'employee' role to user ID: ${newUserId}`);
+    const { error: roleError } = await supabaseAdmin
+      .from('user_roles')
+      .insert({ user_id: newUserId, role: 'employee' });
+
+    if (roleError) {
+      // Log role error, but user and employee creation were successful
+      console.warn(`User and employee created for ${email}, but failed to assign default 'employee' role: ${roleError.message}`);
+      // Not returning an error for this, admin can assign role manually if needed.
+    } else {
+      console.log(`Successfully assigned 'employee' role to user ID: ${newUserId}`);
+    }
+    
+    return new Response(JSON.stringify({ 
+      message: 'Employee and user account created successfully. Role assignment attempted.', 
+      employee: employeeData,
+      userId: newUserId
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 201, // Created
+    });
+
+  } catch (error) {
+    console.error('Unhandled error in create-user-and-employee function:', error.message, error.stack);
+    return new Response(JSON.stringify({ error: 'An unexpected error occurred.', details: error.message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    });
+  }
+});
