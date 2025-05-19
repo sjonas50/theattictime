@@ -11,7 +11,8 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
 import TimeEntriesPage from "./pages/TimeEntriesPage";
 import SupervisorDashboardPage from "./pages/SupervisorDashboardPage";
-import AdminPage from "./pages/AdminPage"; // Import AdminPage
+import AdminPage from "./pages/AdminPage";
+import ExportPage from "./pages/ExportPage"; // Import ExportPage
 
 const queryClient = new QueryClient();
 
@@ -27,7 +28,8 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/time-entries" element={<TimeEntriesPage />} />
               <Route path="/supervisor-dashboard" element={<SupervisorDashboardPage />} />
-              <Route path="/admin" element={<AdminPage />} /> {/* Add AdminPage route */}
+              <Route path="/admin" element={<AdminPage />} />
+              <Route path="/exports" element={<ExportPage />} /> {/* Add ExportPage route */}
               {/* Add other protected routes here */}
             </Route>
             

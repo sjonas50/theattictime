@@ -5,16 +5,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Enums } from '@/integrations/supabase/types';
-import { LogOut, List, ShieldAlert, UserCog } from 'lucide-react'; // Added UserCog for Admin
+import { LogOut, List, ShieldAlert, UserCog, Download } from 'lucide-react'; // Added Download icon
 
 type UserRole = Enums<'app_role'>;
 
 const Layout = ({ children }: { children?: ReactNode }) => {
   const { user, signOut, isLoading: authIsLoading } = useAuth();
   const navigate = useNavigate();
-  // const [userRoles, setUserRoles] = useState<UserRole[]>([]); // No longer needed here, AdminPage checks its own
   const [isSupervisor, setIsSupervisor] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false); // Added isAdmin state
+  const [isAdmin, setIsAdmin] = useState(false);
   const [rolesLoading, setRolesLoading] = useState(true);
 
   useEffect(() => {
@@ -30,17 +29,15 @@ const Layout = ({ children }: { children?: ReactNode }) => {
           console.error('Error fetching user roles in Layout:', error);
         } else if (data) {
           const roles = data.map(r => r.role as UserRole);
-          // setUserRoles(roles); // No longer setting userRoles state here
           setIsSupervisor(roles.includes('supervisor'));
-          setIsAdmin(roles.includes('admin')); // Set isAdmin based on roles
+          setIsAdmin(roles.includes('admin'));
         }
         setRolesLoading(false);
       };
       fetchUserRoles();
     } else if (!user && !authIsLoading) {
-      // setUserRoles([]);
       setIsSupervisor(false);
-      setIsAdmin(false); // Reset isAdmin
+      setIsAdmin(false);
       setRolesLoading(false);
     }
   }, [user, authIsLoading]);
@@ -54,7 +51,7 @@ const Layout = ({ children }: { children?: ReactNode }) => {
       <header className="bg-gray-800 text-white p-4 shadow-md">
         <div className="container mx-auto flex justify-between items-center">
           <Link to="/" className="text-xl font-bold">TimeTrack</Link>
-          <nav className="flex items-center space-x-2 md:space-x-4"> {/* Adjusted spacing for more items */}
+          <nav className="flex items-center space-x-1 md:space-x-2"> {/* Adjusted spacing slightly */}
             {user && (
               <>
                 <Button onClick={() => navigate('/time-entries')} variant="ghost" className="text-white hover:bg-gray-700 px-2 md:px-3">
@@ -65,9 +62,14 @@ const Layout = ({ children }: { children?: ReactNode }) => {
                     <ShieldAlert className="mr-1 md:mr-2 h-4 w-4" /> Supervisor
                   </Button>
                 )}
-                {isAdmin && ( // Add Admin link if user is admin
+                {isAdmin && (
                   <Button onClick={() => navigate('/admin')} variant="ghost" className="text-white hover:bg-gray-700 px-2 md:px-3">
                     <UserCog className="mr-1 md:mr-2 h-4 w-4" /> Admin
+                  </Button>
+                )}
+                {(isAdmin || isSupervisor) && ( // Show Exports link for Admin or Supervisor
+                  <Button onClick={() => navigate('/exports')} variant="ghost" className="text-white hover:bg-gray-700 px-2 md:px-3">
+                    <Download className="mr-1 md:mr-2 h-4 w-4" /> Exports
                   </Button>
                 )}
                 <Button onClick={signOut} variant="ghost" className="text-white hover:bg-gray-700 px-2 md:px-3">
