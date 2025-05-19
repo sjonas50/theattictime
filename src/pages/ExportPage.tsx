@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Enums } from '@/integrations/supabase/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { DatePickerWithRange } from '@/components/ui/date-range-picker'; // We'll create this component later
+// import { DatePickerWithRange } from '@/components/ui/date-range-picker'; // We'll create this component later -- REMOVED THIS LINE
 import { toast } from 'sonner';
 import { Download } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
