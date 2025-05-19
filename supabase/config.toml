@@ -3,3 +3,6 @@ project_id = "mpbwlrpzltkhagzgkbxn" # Do not change this line
 
 [functions.create-user-and-employee]
   verify_jwt = true # Ensures only authenticated users (like an admin) can call this.
+
+[functions.send-timesheet-reminders]
+  verify_jwt = false # Called by pg_cron with anon key
