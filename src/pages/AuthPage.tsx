@@ -13,6 +13,7 @@ const AuthPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -23,7 +24,6 @@ const AuthPage = () => {
       toast.error(error.message);
     } else {
       toast.success('Sign up successful! Please check your email to verify your account.');
-      // You might want to redirect or show a message to check email
     }
     setLoading(false);
   };
@@ -39,6 +39,23 @@ const AuthPage = () => {
       navigate('/');
     }
     setLoading(false);
+  };
+
+  const handlePasswordReset = async () => {
+    if (!email) {
+      toast.error('Please enter your email address.');
+      return;
+    }
+    setForgotPasswordLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      // redirectTo: `${window.location.origin}/update-password` // Optional: if you have a custom update password page
+    });
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success('If an account exists for this email, a password reset link has been sent.');
+    }
+    setForgotPasswordLoading(false);
   };
 
   return (
@@ -64,9 +81,19 @@ const AuthPage = () => {
                   <Label htmlFor="password-signin">Password</Label>
                   <Input id="password-signin" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
                 </div>
+                <div className="text-sm text-right">
+                  <button
+                    type="button"
+                    onClick={handlePasswordReset}
+                    className="font-medium text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={forgotPasswordLoading || loading}
+                  >
+                    {forgotPasswordLoading ? 'Sending...' : 'Forgot password?'}
+                  </button>
+                </div>
               </CardContent>
               <CardFooter>
-                <Button type="submit" className="w-full" disabled={loading}>
+                <Button type="submit" className="w-full" disabled={loading || forgotPasswordLoading}>
                   {loading ? 'Signing In...' : 'Sign In'}
                 </Button>
               </CardFooter>
@@ -104,3 +131,4 @@ const AuthPage = () => {
 };
 
 export default AuthPage;
+
