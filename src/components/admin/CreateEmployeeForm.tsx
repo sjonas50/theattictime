@@ -12,7 +12,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 const employeeFormSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  // Password field removed
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   employeeIdInternal: z.string().min(1, { message: "Internal Employee ID is required." }),
 });
@@ -25,7 +25,7 @@ const CreateEmployeeForm = () => {
     resolver: zodResolver(employeeFormSchema),
     defaultValues: {
       email: '',
-      password: '',
+      // Password default removed
       name: '',
       employeeIdInternal: '',
     },
@@ -36,40 +36,35 @@ const CreateEmployeeForm = () => {
       const { data: functionData, error: functionError } = await supabase.functions.invoke('create-user-and-employee', {
         body: {
           email: values.email,
-          password: values.password,
+          // Password not sent
           name: values.name,
           employeeIdInternal: values.employeeIdInternal,
         }
       });
 
       if (functionError) {
-        // Handle potential network errors or if function itself crashes before returning structured error
         console.error('Error invoking edge function:', functionError);
         toast.error(`Failed to create employee: ${functionError.message}`);
         return;
       }
 
-      // Edge function is expected to return JSON, data could be the parsed JSON or an error object from the function
-      const responseData = functionData; // supabase.functions.invoke already parses JSON if Content-Type is application/json
+      const responseData = functionData;
 
       if (responseData && responseData.error) {
-        // Error explicitly returned by the edge function
         console.error('Error from edge function:', responseData.error);
         toast.error(`Failed to create employee: ${responseData.error}`);
       } else if (responseData && responseData.message) {
-        toast.success(responseData.message);
+        // Updated success message to reflect invitation flow
+        toast.success("Employee invited successfully. They will receive an email to set up their account.");
         form.reset();
         queryClient.invalidateQueries({ queryKey: ['employees_admin'] });
         queryClient.invalidateQueries({ queryKey: ['user_roles_admin'] });
-        // Potentially invalidate auth users list if that's displayed anywhere admin can see
       } else {
-        // Fallback for unexpected response structure
         console.error('Unexpected response from edge function:', responseData);
         toast.error('An unexpected error occurred while creating the employee.');
       }
 
     } catch (error: any) {
-      // Catch-all for other unexpected errors during the process
       console.error('Error creating employee (client-side catch):', error);
       toast.error(`Failed to create employee: ${error.message || 'An unknown error occurred.'}`);
     }
@@ -91,19 +86,7 @@ const CreateEmployeeForm = () => {
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="password"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Password</FormLabel>
-              <FormControl>
-                <Input type="password" placeholder="Enter a temporary password" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {/* Password FormField removed */}
         <FormField
           control={form.control}
           name="name"
@@ -131,7 +114,7 @@ const CreateEmployeeForm = () => {
           )}
         />
         <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? 'Creating...' : 'Create Employee & User Account'}
+          {form.formState.isSubmitting ? 'Sending Invite...' : 'Invite Employee & Create User Account'}
         </Button>
       </form>
     </Form>
@@ -139,3 +122,4 @@ const CreateEmployeeForm = () => {
 };
 
 export default CreateEmployeeForm;
+

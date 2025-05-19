@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -6,26 +5,24 @@ import { corsHeaders } from '../_shared/cors.ts';
 console.log("Create User and Employee Edge Function initializing");
 
 serve(async (req: Request) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
     const body = await req.json();
-    const { email, password, name, employeeIdInternal } = body;
+    const { email, name, employeeIdInternal } = body;
 
-    console.log("Received request to create user and employee:", { email, name, employeeIdInternal });
+    console.log("Received request to create user and employee (invitation flow):", { email, name, employeeIdInternal });
 
-    if (!email || !password || !name || !employeeIdInternal) {
+    if (!email || !name || !employeeIdInternal) {
       console.log("Missing required fields");
-      return new Response(JSON.stringify({ error: 'Missing required fields: email, password, name, and employeeIdInternal are required.' }), {
+      return new Response(JSON.stringify({ error: 'Missing required fields: email, name, and employeeIdInternal are required.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       });
     }
 
-    // Ensure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are available
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
@@ -39,20 +36,18 @@ serve(async (req: Request) => {
     
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-    // 1. Create the user in auth.users
-    console.log(`Attempting to create auth user for: ${email}`);
+    console.log(`Attempting to create auth user (invitation flow) for: ${email}`);
     const { data: authUserResponse, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
-      password: password,
-      email_confirm: true, // Set to true so users need to confirm. Or false for auto-confirmation.
+      email_confirm: true, // Ensures email is confirmed as part of the invitation
     });
 
     if (authError) {
       console.error('Error creating auth user:', authError.message);
-      if (authError.message.includes('User already registered') || (authError as any).status === 422) { // Supabase might return 422 for already registered
+      if (authError.message.includes('User already registered') || (authError as any).status === 422) {
         return new Response(JSON.stringify({ error: 'A user with this email already exists.' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 409, // Conflict
+          status: 409,
         });
       }
       return new Response(JSON.stringify({ error: `Failed to create auth user: ${authError.message}` }), {
@@ -62,9 +57,8 @@ serve(async (req: Request) => {
     }
 
     const newUserId = authUserResponse.user.id;
-    console.log(`Auth user created successfully: ${newUserId} for email: ${email}`);
+    console.log(`Auth user created successfully (invitation sent): ${newUserId} for email: ${email}`);
 
-    // 2. Create the employee record in public.employees
     console.log(`Attempting to create employee record for user ID: ${newUserId}`);
     const { data: employeeData, error: employeeError } = await supabaseAdmin
       .from('employees')
@@ -78,7 +72,6 @@ serve(async (req: Request) => {
 
     if (employeeError) {
       console.error('Error creating employee record:', employeeError.message);
-      // Attempt to delete the auth user if employee creation fails (rollback)
       console.log(`Attempting to roll back auth user creation for ID: ${newUserId}`);
       const { error: deleteUserError } = await supabaseAdmin.auth.admin.deleteUser(newUserId);
       if (deleteUserError) {
@@ -93,27 +86,24 @@ serve(async (req: Request) => {
     }
     console.log(`Employee record created successfully for user ID: ${newUserId}`, employeeData);
 
-    // 3. Assign default 'employee' role in public.user_roles
     console.log(`Attempting to assign 'employee' role to user ID: ${newUserId}`);
     const { error: roleError } = await supabaseAdmin
       .from('user_roles')
       .insert({ user_id: newUserId, role: 'employee' });
 
     if (roleError) {
-      // Log role error, but user and employee creation were successful
       console.warn(`User and employee created for ${email}, but failed to assign default 'employee' role: ${roleError.message}`);
-      // Not returning an error for this, admin can assign role manually if needed.
     } else {
       console.log(`Successfully assigned 'employee' role to user ID: ${newUserId}`);
     }
     
     return new Response(JSON.stringify({ 
-      message: 'Employee and user account created successfully. Role assignment attempted.', 
+      message: 'Employee invited and user account created successfully. Role assignment attempted. User will receive an invitation email.', 
       employee: employeeData,
       userId: newUserId
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 201, // Created
+      status: 201,
     });
 
   } catch (error) {
