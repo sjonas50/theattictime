@@ -7,6 +7,7 @@ import CreateEmployeeForm from '@/components/admin/CreateEmployeeForm';
 import EmployeeManagementTable from '@/components/admin/EmployeeManagementTable';
 import ProjectCodeManagement from '@/components/admin/ProjectCodeManagement';
 import { toast } from "sonner";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Added Card components
 
 type UserRole = Enums<'app_role'>;
 
@@ -14,9 +15,9 @@ const AdminPage = () => {
   const { user } = useAuth();
   const [isAdminOrSupervisor, setIsAdminOrSupervisor] = useState(false);
   const [loadingUserRoles, setLoadingUserRoles] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false); // Moved this hook to the top
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  useEffect(() => { // useEffect for isAdminOrSupervisor
+  useEffect(() => {
     if (user) {
       const fetchUserRoles = async () => {
         setLoadingUserRoles(true);
@@ -41,20 +42,20 @@ const AdminPage = () => {
     }
   }, [user]);
 
-  useEffect(() => { // useEffect for isAdmin, moved to the top
+  useEffect(() => {
     if (user) {
       const checkAdmin = async () => {
         const { data } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id)
-          .eq('role', 'admin') // Specifically check for admin
+          .eq('role', 'admin')
           .maybeSingle();
         setIsAdmin(!!data);
       };
       checkAdmin();
     } else {
-      setIsAdmin(false); // Reset isAdmin if no user
+      setIsAdmin(false);
     }
   }, [user]);
 
@@ -65,34 +66,46 @@ const AdminPage = () => {
   if (!isAdminOrSupervisor) {
     return (
       <div className="container mx-auto p-4">
-        <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
-        <p>You do not have permission to view this page. Admin or Supervisor role required.</p>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold text-destructive">Access Denied</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>You do not have permission to view this page. Admin or Supervisor role required.</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-6 text-gray-800">Admin Dashboard</h1>
+    <div className="container mx-auto p-4 space-y-8">
+      <h1 className="text-3xl font-bold text-primary">Admin Dashboard</h1>
       
       {isAdmin && (
         <>
-          <div className="mb-8 p-6 bg-white shadow-lg rounded-lg">
-            <h2 className="text-2xl font-semibold mb-4 text-gray-700">Create New Employee</h2>
-            <CreateEmployeeForm />
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-2xl font-semibold text-card-foreground">Create New Employee</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CreateEmployeeForm />
+            </CardContent>
+          </Card>
 
-          <div className="p-6 bg-white shadow-lg rounded-lg mb-8">
-            <h2 className="text-2xl font-semibold mb-4 text-gray-700">Manage Employees & Roles</h2>
-            <EmployeeManagementTable />
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-2xl font-semibold text-card-foreground">Manage Employees & Roles</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <EmployeeManagementTable />
+            </CardContent>
+          </Card>
         </>
       )}
 
-      <div className="p-6 bg-white shadow-lg rounded-lg">
-        <h2 className="text-2xl font-semibold mb-4 text-gray-700">Manage Project Codes</h2>
-        <ProjectCodeManagement />
-      </div>
+      {/* ProjectCodeManagement already renders its own Card structure including title */}
+      <ProjectCodeManagement />
     </div>
   );
 };
