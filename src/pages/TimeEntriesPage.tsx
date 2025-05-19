@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -84,7 +85,7 @@ const TimeEntriesPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('project_codes')
-        .select('id, code, name, description') // Select necessary fields
+        .select('*') // Select all fields to match ProjectCode type
         .eq('is_active', true)
         .order('code', { ascending: true });
       if (error) {
@@ -574,3 +575,4 @@ const TimeEntriesPage = () => {
 };
 
 export default TimeEntriesPage;
+
