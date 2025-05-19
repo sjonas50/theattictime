@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react'; // Removed useState, useEffect as they are not directly used here anymore
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Enums, Tables } from '@/integrations/supabase/types';
@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from 'sonner';
 import { Trash } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 
 type Employee = Tables<'employees'>;
 type UserRoleEntry = Tables<'user_roles'>;
@@ -29,6 +30,7 @@ const fetchUserRolesAdmin = async (): Promise<UserRoleEntry[]> => {
 
 const EmployeeManagementTable = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth(); // Get the current authenticated user
 
   const { data: employees, isLoading: isLoadingEmployees, error: employeesError } = useQuery({
     queryKey: ['employees_admin'],
@@ -104,6 +106,14 @@ const EmployeeManagementTable = () => {
     if (isChecked) {
       newRoles = [...currentRoles, role];
     } else {
+      // Prevent unchecking 'admin' role for self
+      if (user && userId === user.id && role === 'admin') {
+        toast.error("You cannot remove your own 'admin' role.");
+        // Re-check the box visually by invalidating, or prevent mutation call if possible
+        // For now, we disabled the checkbox, but this is a fallback if somehow triggered
+        queryClient.invalidateQueries({ queryKey: ['user_roles_admin'] }); 
+        return;
+      }
       newRoles = currentRoles.filter(r => r !== role);
     }
     updateUserRolesMutation.mutate({ userId, newRoles });
@@ -129,25 +139,35 @@ const EmployeeManagementTable = () => {
                 <TableCell>{employee.name}</TableCell>
                 <TableCell>{employee.employee_id_internal}</TableCell>
                 <TableCell>{employee.user_id}</TableCell>
-                {ALL_ROLES.map(role => (
-                  <TableCell key={role}>
-                    <Checkbox
-                      id={`role-${employee.user_id}-${role}`}
-                      checked={currentRoles.includes(role)}
-                      onCheckedChange={(checked) => handleRoleChange(employee.user_id, role, !!checked)}
-                    />
-                  </TableCell>
-                ))}
+                {ALL_ROLES.map(role => {
+                  const isSelfAdminRole = user && employee.user_id === user.id && role === 'admin';
+                  return (
+                    <TableCell key={role}>
+                      <Checkbox
+                        id={`role-${employee.user_id}-${role}`}
+                        checked={currentRoles.includes(role)}
+                        onCheckedChange={(checked) => handleRoleChange(employee.user_id, role, !!checked)}
+                        disabled={isSelfAdminRole || updateUserRolesMutation.isPending} // Disable if it's self admin role or mutation is pending
+                        aria-label={`Assign ${role} role to ${employee.name}`}
+                      />
+                    </TableCell>
+                  );
+                })}
                 <TableCell>
                   <Button 
                     variant="destructive" 
                     size="sm" 
                     onClick={() => {
+                      // Prevent deleting self if user is an admin and the employee record is theirs
+                      if (user && employee.user_id === user.id && currentRoles.includes('admin')) {
+                         toast.error("Administrators cannot delete their own employee record.");
+                         return;
+                      }
                       if (window.confirm(`Are you sure you want to delete employee ${employee.name}? This action cannot be undone.`)) {
                         deleteEmployeeMutation.mutate(employee.id);
                       }
                     }}
-                    disabled={deleteEmployeeMutation.isPending}
+                    disabled={deleteEmployeeMutation.isPending || (user && employee.user_id === user.id && currentRoles.includes('admin'))}
                   >
                     <Trash className="h-4 w-4 mr-1" /> Delete
                   </Button>
@@ -163,3 +183,4 @@ const EmployeeManagementTable = () => {
 };
 
 export default EmployeeManagementTable;
+
