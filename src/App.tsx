@@ -9,6 +9,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
 import TimeEntriesPage from "./pages/TimeEntriesPage";
+import SupervisorDashboardPage from "./pages/SupervisorDashboardPage";
 
 const queryClient = new QueryClient();
 
@@ -23,6 +24,7 @@ const App = () => (
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={<Index />} />
               <Route path="/time-entries" element={<TimeEntriesPage />} />
+              <Route path="/supervisor-dashboard" element={<SupervisorDashboardPage />} />
               {/* Add other protected routes here */}
             </Route>
             

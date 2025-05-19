@@ -1,17 +1,51 @@
 
-import { ReactNode } from 'react';
+import { ReactNode, useState, useEffect } from 'react'; // Added useState, useEffect
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-// Toaster import removed as it's now global in App.tsx
-import { LogOut, List } from 'lucide-react'; // Added List icon
+import { supabase } from '@/integrations/supabase/client'; // Added supabase import
+import { Enums } from '@/integrations/supabase/types'; // Added Enums import
+import { LogOut, List, ShieldAlert } from 'lucide-react'; // Added ShieldAlert icon
+
+type UserRole = Enums<'app_role'>;
 
 const Layout = ({ children }: { children?: ReactNode }) => {
-  const { user, signOut, isLoading } = useAuth();
+  const { user, signOut, isLoading: authIsLoading } = useAuth();
   const navigate = useNavigate();
+  const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+  const [isSupervisor, setIsSupervisor] = useState(false);
+  const [rolesLoading, setRolesLoading] = useState(true);
 
-  if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  useEffect(() => {
+    if (user && !authIsLoading) {
+      setRolesLoading(true);
+      const fetchUserRoles = async () => {
+        const { data, error } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id);
+
+        if (error) {
+          console.error('Error fetching user roles in Layout:', error);
+          // Don't toast here, might be too noisy
+        } else if (data) {
+          const roles = data.map(r => r.role as UserRole);
+          setUserRoles(roles);
+          setIsSupervisor(roles.includes('supervisor'));
+        }
+        setRolesLoading(false);
+      };
+      fetchUserRoles();
+    } else if (!user && !authIsLoading) {
+      // No user, clear roles
+      setUserRoles([]);
+      setIsSupervisor(false);
+      setRolesLoading(false);
+    }
+  }, [user, authIsLoading]);
+
+  if (authIsLoading || (user && rolesLoading)) { // Wait for auth and roles if user exists
+    return <div className="min-h-screen flex items-center justify-center">Loading user data...</div>;
   }
 
   return (
@@ -23,8 +57,13 @@ const Layout = ({ children }: { children?: ReactNode }) => {
             {user && (
               <>
                 <Button onClick={() => navigate('/time-entries')} variant="ghost" className="text-white hover:bg-gray-700">
-                  <List className="mr-2 h-4 w-4" /> Time Entries
+                  <List className="mr-2 h-4 w-4" /> My Time Entries
                 </Button>
+                {isSupervisor && (
+                  <Button onClick={() => navigate('/supervisor-dashboard')} variant="ghost" className="text-white hover:bg-gray-700">
+                    <ShieldAlert className="mr-2 h-4 w-4" /> Supervisor Dashboard
+                  </Button>
+                )}
                 <Button onClick={signOut} variant="ghost" className="text-white hover:bg-gray-700">
                   <LogOut className="mr-2 h-4 w-4" /> Sign Out
                 </Button>
@@ -41,10 +80,8 @@ const Layout = ({ children }: { children?: ReactNode }) => {
       <main className="flex-grow container mx-auto p-4">
         {children || <Outlet />}
       </main>
-      {/* Toaster component removed from here */}
     </div>
   );
 };
 
 export default Layout;
-
