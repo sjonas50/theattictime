@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
 import App from './App.tsx'; // Assuming App.tsx provides a basic structure or Outlet
 import './index.css';
 import { AuthProvider } from './contexts/AuthContext';
@@ -37,3 +37,4 @@ root.render(
     </Router>
   </React.StrictMode>
 );
+
