@@ -14,12 +14,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Calendar as CalendarIcon, Plus, Trash2, CheckCircle2, Edit3, XCircle } from 'lucide-react';
+import { Calendar as CalendarIcon, Plus, Trash2, CheckCircle2, Edit3, XCircle, Loader2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 // Update the form schema to include modification_reason (optional for new, required for edit)
 const timeEntrySchema = z.object({
-  project_code: z.string().min(1, "Project code is required"),
+  project_code: z.string().min(1, "Project code is required"), // This remains a string
   hours_worked: z.coerce.number().min(0.1, "Hours worked must be greater than 0").max(24, "Hours cannot exceed 24"),
   notes: z.string().optional(),
   entry_date: z.date({ required_error: "Entry date is required" }),
@@ -28,6 +29,7 @@ const timeEntrySchema = z.object({
 
 type TimeEntryFormValues = z.infer<typeof timeEntrySchema>;
 type TimeEntry = Tables<'time_entries'>;
+type ProjectCode = Tables<'project_codes'>; // Add type for project codes
 type TimeEntryModificationInsert = TablesInsert<'time_entry_modifications'>;
 
 // Define the specific shape of data passed to the addTimeEntryMutation
@@ -75,6 +77,23 @@ const TimeEntriesPage = () => {
       fetchEmployeeId();
     }
   }, [user]);
+
+  // Fetch active project codes for the dropdown
+  const { data: projectCodes, isLoading: isLoadingProjectCodes } = useQuery<ProjectCode[], Error>({
+    queryKey: ['projectCodes'], // Use a distinct key if AdminPage also fetches them differently
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('project_codes')
+        .select('id, code, name, description') // Select necessary fields
+        .eq('is_active', true)
+        .order('code', { ascending: true });
+      if (error) {
+        toast.error(`Failed to load project codes: ${error.message}`);
+        throw new Error(error.message);
+      }
+      return data || [];
+    },
+  });
 
   const form = useForm<TimeEntryFormValues>({
     resolver: zodResolver(timeEntrySchema),
@@ -154,6 +173,7 @@ const TimeEntriesPage = () => {
       queryClient.invalidateQueries({ queryKey: ['timeEntries', employeeId] });
       toast.success('Time entry added successfully!');
       form.reset();
+      setEditingEntry(null);
     },
     onError: (error) => {
       toast.error(`Failed to add time entry: ${error.message}`);
@@ -290,6 +310,8 @@ const TimeEntriesPage = () => {
       };
       if (values.notes && values.notes.trim() !== '') {
         payload.notes = values.notes;
+      } else {
+        payload.notes = null; // Ensure notes are explicitly set to null if empty
       }
       updateTimeEntryMutation.mutate(payload);
 
@@ -301,6 +323,8 @@ const TimeEntriesPage = () => {
       };
       if (values.notes && values.notes.trim() !== '') {
         payload.notes = values.notes;
+      } else {
+        payload.notes = undefined; // Or null, depending on how your backend handles it
       }
       addTimeEntryMutation.mutate(payload);
     }
@@ -383,9 +407,32 @@ const TimeEntriesPage = () => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Project Code</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., PRJ-001" {...field} />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger disabled={isLoadingProjectCodes}>
+                          {isLoadingProjectCodes ? (
+                            <span className="flex items-center">
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading codes...
+                            </span>
+                          ) : (
+                            <SelectValue placeholder="Select a project code" />
+                          )}
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {projectCodes && projectCodes.length > 0 ? (
+                          projectCodes.map((pc) => (
+                            <SelectItem key={pc.id} value={pc.code}>
+                              {pc.name ? `${pc.code} - ${pc.name}` : pc.code}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="loading" disabled>
+                            {isLoadingProjectCodes ? 'Loading...' : 'No active project codes found.'}
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -412,7 +459,7 @@ const TimeEntriesPage = () => {
                   <FormItem>
                     <FormLabel>Notes (Optional)</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Brief description of work done" {...field} />
+                      <Textarea placeholder="Brief description of work done" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -427,7 +474,7 @@ const TimeEntriesPage = () => {
                     <FormItem>
                       <FormLabel>Reason for Change (Required)</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="Explain why this change is being made..." {...field} />
+                        <Textarea placeholder="Explain why this change is being made..." {...field} value={field.value ?? ""}/>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -435,7 +482,7 @@ const TimeEntriesPage = () => {
                 />
               )}
               <div className="flex space-x-2">
-                <Button type="submit" disabled={addTimeEntryMutation.isPending || updateTimeEntryMutation.isPending}>
+                <Button type="submit" disabled={addTimeEntryMutation.isPending || updateTimeEntryMutation.isPending || isLoadingProjectCodes}>
                   {editingEntry 
                     ? <><CheckCircle2 className="mr-2 h-4 w-4" /> {updateTimeEntryMutation.isPending ? 'Updating...' : 'Update Entry'}</>
                     : <><Plus className="mr-2 h-4 w-4" /> {addTimeEntryMutation.isPending ? 'Adding...' : 'Add Entry as Draft'}</>
