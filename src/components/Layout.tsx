@@ -1,19 +1,20 @@
 
-import { ReactNode, useState, useEffect } from 'react'; // Added useState, useEffect
+import { ReactNode, useState, useEffect } from 'react';
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client'; // Added supabase import
-import { Enums } from '@/integrations/supabase/types'; // Added Enums import
-import { LogOut, List, ShieldAlert } from 'lucide-react'; // Added ShieldAlert icon
+import { supabase } from '@/integrations/supabase/client';
+import { Enums } from '@/integrations/supabase/types';
+import { LogOut, List, ShieldAlert, UserCog } from 'lucide-react'; // Added UserCog for Admin
 
 type UserRole = Enums<'app_role'>;
 
 const Layout = ({ children }: { children?: ReactNode }) => {
   const { user, signOut, isLoading: authIsLoading } = useAuth();
   const navigate = useNavigate();
-  const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+  // const [userRoles, setUserRoles] = useState<UserRole[]>([]); // No longer needed here, AdminPage checks its own
   const [isSupervisor, setIsSupervisor] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false); // Added isAdmin state
   const [rolesLoading, setRolesLoading] = useState(true);
 
   useEffect(() => {
@@ -27,24 +28,24 @@ const Layout = ({ children }: { children?: ReactNode }) => {
 
         if (error) {
           console.error('Error fetching user roles in Layout:', error);
-          // Don't toast here, might be too noisy
         } else if (data) {
           const roles = data.map(r => r.role as UserRole);
-          setUserRoles(roles);
+          // setUserRoles(roles); // No longer setting userRoles state here
           setIsSupervisor(roles.includes('supervisor'));
+          setIsAdmin(roles.includes('admin')); // Set isAdmin based on roles
         }
         setRolesLoading(false);
       };
       fetchUserRoles();
     } else if (!user && !authIsLoading) {
-      // No user, clear roles
-      setUserRoles([]);
+      // setUserRoles([]);
       setIsSupervisor(false);
+      setIsAdmin(false); // Reset isAdmin
       setRolesLoading(false);
     }
   }, [user, authIsLoading]);
 
-  if (authIsLoading || (user && rolesLoading)) { // Wait for auth and roles if user exists
+  if (authIsLoading || (user && rolesLoading)) {
     return <div className="min-h-screen flex items-center justify-center">Loading user data...</div>;
   }
 
@@ -53,19 +54,24 @@ const Layout = ({ children }: { children?: ReactNode }) => {
       <header className="bg-gray-800 text-white p-4 shadow-md">
         <div className="container mx-auto flex justify-between items-center">
           <Link to="/" className="text-xl font-bold">TimeTrack</Link>
-          <nav className="flex items-center space-x-4">
+          <nav className="flex items-center space-x-2 md:space-x-4"> {/* Adjusted spacing for more items */}
             {user && (
               <>
-                <Button onClick={() => navigate('/time-entries')} variant="ghost" className="text-white hover:bg-gray-700">
-                  <List className="mr-2 h-4 w-4" /> My Time Entries
+                <Button onClick={() => navigate('/time-entries')} variant="ghost" className="text-white hover:bg-gray-700 px-2 md:px-3">
+                  <List className="mr-1 md:mr-2 h-4 w-4" /> My Time
                 </Button>
                 {isSupervisor && (
-                  <Button onClick={() => navigate('/supervisor-dashboard')} variant="ghost" className="text-white hover:bg-gray-700">
-                    <ShieldAlert className="mr-2 h-4 w-4" /> Supervisor Dashboard
+                  <Button onClick={() => navigate('/supervisor-dashboard')} variant="ghost" className="text-white hover:bg-gray-700 px-2 md:px-3">
+                    <ShieldAlert className="mr-1 md:mr-2 h-4 w-4" /> Supervisor
                   </Button>
                 )}
-                <Button onClick={signOut} variant="ghost" className="text-white hover:bg-gray-700">
-                  <LogOut className="mr-2 h-4 w-4" /> Sign Out
+                {isAdmin && ( // Add Admin link if user is admin
+                  <Button onClick={() => navigate('/admin')} variant="ghost" className="text-white hover:bg-gray-700 px-2 md:px-3">
+                    <UserCog className="mr-1 md:mr-2 h-4 w-4" /> Admin
+                  </Button>
+                )}
+                <Button onClick={signOut} variant="ghost" className="text-white hover:bg-gray-700 px-2 md:px-3">
+                  <LogOut className="mr-1 md:mr-2 h-4 w-4" /> Sign Out
                 </Button>
               </>
             )}

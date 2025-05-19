@@ -1,3 +1,4 @@
+
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -10,6 +11,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
 import TimeEntriesPage from "./pages/TimeEntriesPage";
 import SupervisorDashboardPage from "./pages/SupervisorDashboardPage";
+import AdminPage from "./pages/AdminPage"; // Import AdminPage
 
 const queryClient = new QueryClient();
 
@@ -25,6 +27,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/time-entries" element={<TimeEntriesPage />} />
               <Route path="/supervisor-dashboard" element={<SupervisorDashboardPage />} />
+              <Route path="/admin" element={<AdminPage />} /> {/* Add AdminPage route */}
               {/* Add other protected routes here */}
             </Route>
             
