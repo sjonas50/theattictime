@@ -9,16 +9,201 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      employees: {
+        Row: {
+          created_at: string
+          employee_id_internal: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id_internal: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          employee_id_internal?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      time_entries: {
+        Row: {
+          approved_at: string | null
+          approved_by_supervisor_id: string | null
+          created_at: string
+          employee_id: string
+          entry_date: string
+          hours_worked: number
+          id: string
+          is_finalized: boolean
+          notes: string | null
+          project_code: string
+          rejected_at: string | null
+          rejection_reason: string | null
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by_supervisor_id?: string | null
+          created_at?: string
+          employee_id: string
+          entry_date?: string
+          hours_worked: number
+          id?: string
+          is_finalized?: boolean
+          notes?: string | null
+          project_code: string
+          rejected_at?: string | null
+          rejection_reason?: string | null
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by_supervisor_id?: string | null
+          created_at?: string
+          employee_id?: string
+          entry_date?: string
+          hours_worked?: number
+          id?: string
+          is_finalized?: boolean
+          notes?: string | null
+          project_code?: string
+          rejected_at?: string | null
+          rejection_reason?: string | null
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_entries_approved_by_supervisor_id_fkey"
+            columns: ["approved_by_supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      time_entry_modifications: {
+        Row: {
+          id: string
+          modification_timestamp: string
+          modified_by_employee_id: string
+          new_entry_date: string | null
+          new_hours_worked: number | null
+          new_notes: string | null
+          new_project_code: string | null
+          old_entry_date: string | null
+          old_hours_worked: number | null
+          old_notes: string | null
+          old_project_code: string | null
+          reason_for_change: string
+          time_entry_id: string
+        }
+        Insert: {
+          id?: string
+          modification_timestamp?: string
+          modified_by_employee_id: string
+          new_entry_date?: string | null
+          new_hours_worked?: number | null
+          new_notes?: string | null
+          new_project_code?: string | null
+          old_entry_date?: string | null
+          old_hours_worked?: number | null
+          old_notes?: string | null
+          old_project_code?: string | null
+          reason_for_change: string
+          time_entry_id: string
+        }
+        Update: {
+          id?: string
+          modification_timestamp?: string
+          modified_by_employee_id?: string
+          new_entry_date?: string | null
+          new_hours_worked?: number | null
+          new_notes?: string | null
+          new_project_code?: string | null
+          old_entry_date?: string | null
+          old_hours_worked?: number | null
+          old_notes?: string | null
+          old_project_code?: string | null
+          reason_for_change?: string
+          time_entry_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_entry_modifications_modified_by_employee_id_fkey"
+            columns: ["modified_by_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entry_modifications_time_entry_id_fkey"
+            columns: ["time_entry_id"]
+            isOneToOne: false
+            referencedRelation: "time_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _user_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "supervisor" | "employee"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -133,6 +318,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "supervisor", "employee"],
+    },
   },
 } as const
