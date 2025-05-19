@@ -14,19 +14,21 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Calendar as CalendarIcon, Plus, Trash2, CheckCircle2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Plus, Trash2, CheckCircle2, Edit3, XCircle } from 'lucide-react';
 import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
-// Define the form schema based on the time_entries table
+// Update the form schema to include modification_reason (optional for new, required for edit)
 const timeEntrySchema = z.object({
   project_code: z.string().min(1, "Project code is required"),
   hours_worked: z.coerce.number().min(0.1, "Hours worked must be greater than 0").max(24, "Hours cannot exceed 24"),
   notes: z.string().optional(),
   entry_date: z.date({ required_error: "Entry date is required" }),
+  modification_reason: z.string().optional(),
 });
 
 type TimeEntryFormValues = z.infer<typeof timeEntrySchema>;
 type TimeEntry = Tables<'time_entries'>;
+type TimeEntryModificationInsert = TablesInsert<'time_entry_modifications'>;
 
 // Define the specific shape of data passed to the addTimeEntryMutation
 type AddTimeEntryVariables = {
@@ -36,10 +38,23 @@ type AddTimeEntryVariables = {
   entry_date: string; // Formatted as yyyy-MM-dd
 };
 
+// Define variables for updating a time entry
+type UpdateTimeEntryVariables = {
+  id: string;
+  project_code: string;
+  hours_worked: number;
+  notes?: string;
+  entry_date: string; // Formatted as yyyy-MM-dd
+  modification_reason: string;
+  original_entry: TimeEntry; // To log changes
+};
+
+
 const TimeEntriesPage = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [employeeId, setEmployeeId] = useState<string | null>(null);
+  const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
 
   // Fetch employee_id for the current user
   useEffect(() => {
@@ -68,8 +83,29 @@ const TimeEntriesPage = () => {
       hours_worked: 0,
       notes: '',
       entry_date: new Date(),
+      modification_reason: '',
     },
   });
+
+  useEffect(() => {
+    if (editingEntry) {
+      form.reset({
+        project_code: editingEntry.project_code,
+        hours_worked: editingEntry.hours_worked,
+        entry_date: new Date(editingEntry.entry_date),
+        notes: editingEntry.notes || '',
+        modification_reason: '', // Clear reason on new edit
+      });
+    } else {
+      form.reset({ // Reset to default for new entry
+        project_code: '',
+        hours_worked: 0,
+        notes: '',
+        entry_date: new Date(),
+        modification_reason: '',
+      });
+    }
+  }, [editingEntry, form]);
 
   // Fetch time entries
   const { data: timeEntries, isLoading: isLoadingEntries } = useQuery<TimeEntry[], Error>({
@@ -124,6 +160,70 @@ const TimeEntriesPage = () => {
     },
   });
 
+  // Mutation to update an existing time entry and log modification
+  const updateTimeEntryMutation = useMutation<TimeEntry, Error, UpdateTimeEntryVariables>({
+    mutationFn: async ({ id, original_entry, modification_reason, ...updatedValues }) => {
+      if (!employeeId) throw new Error("Employee ID not found.");
+
+      const entryUpdate: TablesUpdate<'time_entries'> = {
+        project_code: updatedValues.project_code,
+        hours_worked: updatedValues.hours_worked,
+        notes: updatedValues.notes,
+        entry_date: updatedValues.entry_date,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data: updatedEntry, error: updateError } = await supabase
+        .from('time_entries')
+        .update(entryUpdate)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateError) throw new Error(`Failed to update time entry: ${updateError.message}`);
+      if (!updatedEntry) throw new Error("No data returned after update.");
+
+      // Log the modification
+      const modificationLog: TimeEntryModificationInsert = {
+        time_entry_id: id,
+        modified_by_employee_id: employeeId,
+        reason_for_change: modification_reason,
+        old_project_code: original_entry.project_code !== updatedValues.project_code ? original_entry.project_code : null,
+        new_project_code: original_entry.project_code !== updatedValues.project_code ? updatedValues.project_code : null,
+        old_hours_worked: original_entry.hours_worked !== updatedValues.hours_worked ? original_entry.hours_worked : null,
+        new_hours_worked: original_entry.hours_worked !== updatedValues.hours_worked ? updatedValues.hours_worked : null,
+        old_entry_date: original_entry.entry_date !== updatedValues.entry_date ? original_entry.entry_date : null,
+        new_entry_date: original_entry.entry_date !== updatedValues.entry_date ? updatedValues.entry_date : null,
+        old_notes: (original_entry.notes || '') !== (updatedValues.notes || '') ? original_entry.notes : null,
+        new_notes: (original_entry.notes || '') !== (updatedValues.notes || '') ? updatedValues.notes : null,
+      };
+
+      // Remove null fields from modification log, as Supabase might error on explicit nulls for non-nullable DB columns if they weren't actually changed.
+      // However, our schema type `TimeEntryModificationInsert` uses `| null` for these fields, so Supabase client should handle it.
+      // Let's ensure we only send fields that actually changed.
+
+      const { error: logError } = await supabase
+        .from('time_entry_modifications')
+        .insert(modificationLog);
+
+      if (logError) {
+        // Attempt to rollback or notify about logging failure, for now just toast
+        toast.error(`Entry updated, but failed to log modification: ${logError.message}`);
+      }
+      
+      return updatedEntry;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['timeEntries', employeeId] });
+      toast.success('Time entry updated successfully!');
+      setEditingEntry(null); // Exit editing mode
+      // form.reset() is handled by useEffect on editingEntry change
+    },
+    onError: (error) => {
+      toast.error(`Failed to update time entry: ${error.message}`);
+    },
+  });
+
   // Mutation to submit a time entry
   const submitTimeEntryMutation = useMutation<TimeEntry, Error, string>({
     mutationFn: async (entryId) => {
@@ -173,15 +273,47 @@ const TimeEntriesPage = () => {
       toast.error("Cannot submit entry: Employee details not found.");
       return;
     }
-    const payload: AddTimeEntryVariables = {
-      project_code: values.project_code,
-      hours_worked: values.hours_worked,
-      entry_date: format(values.entry_date, 'yyyy-MM-dd'),
-    };
-    if (values.notes && values.notes.trim() !== '') { // Only include notes if present and not empty
-      payload.notes = values.notes;
+
+    if (editingEntry) { // Handle update
+      if (!values.modification_reason || values.modification_reason.trim() === '') {
+        form.setError("modification_reason", { type: "manual", message: "Reason for change is required when editing." });
+        toast.error("Please provide a reason for the change.");
+        return;
+      }
+      const payload: UpdateTimeEntryVariables = {
+        id: editingEntry.id,
+        project_code: values.project_code,
+        hours_worked: values.hours_worked,
+        entry_date: format(values.entry_date, 'yyyy-MM-dd'),
+        modification_reason: values.modification_reason,
+        original_entry: editingEntry, // Pass the original entry for logging
+      };
+      if (values.notes && values.notes.trim() !== '') {
+        payload.notes = values.notes;
+      }
+      updateTimeEntryMutation.mutate(payload);
+
+    } else { // Handle add new
+      const payload: AddTimeEntryVariables = {
+        project_code: values.project_code,
+        hours_worked: values.hours_worked,
+        entry_date: format(values.entry_date, 'yyyy-MM-dd'),
+      };
+      if (values.notes && values.notes.trim() !== '') {
+        payload.notes = values.notes;
+      }
+      addTimeEntryMutation.mutate(payload);
     }
-    addTimeEntryMutation.mutate(payload);
+  };
+
+  const handleEdit = (entry: TimeEntry) => {
+    setEditingEntry(entry);
+    window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll to form
+  };
+
+  const cancelEdit = () => {
+    setEditingEntry(null);
+    // form.reset() handled by useEffect
   };
 
   if (!user) {
@@ -203,8 +335,12 @@ const TimeEntriesPage = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Add New Time Entry</CardTitle>
-          <CardDescription>Fill in the details below to log your time. Entries are saved as drafts until submitted.</CardDescription>
+          <CardTitle>{editingEntry ? 'Edit Time Entry' : 'Add New Time Entry'}</CardTitle>
+          <CardDescription>
+            {editingEntry 
+              ? 'Modify the details of your time entry below. A reason for change is required.'
+              : 'Fill in the details below to log your time. Entries are saved as drafts until submitted.'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -261,7 +397,9 @@ const TimeEntriesPage = () => {
                   <FormItem>
                     <FormLabel>Hours Worked</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" placeholder="e.g., 7.5" {...field} />
+                      <Input type="number" step="0.01" placeholder="e.g., 7.5" {...field} 
+                        onChange={e => field.onChange(parseFloat(e.target.value) || 0)} // ensure number type
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -280,9 +418,35 @@ const TimeEntriesPage = () => {
                   </FormItem>
                 )}
               />
-              <Button type="submit" disabled={addTimeEntryMutation.isPending}>
-                <Plus className="mr-2 h-4 w-4" /> {addTimeEntryMutation.isPending ? 'Adding...' : 'Add Entry as Draft'}
-              </Button>
+
+              {editingEntry && (
+                <FormField
+                  control={form.control}
+                  name="modification_reason"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Reason for Change (Required)</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="Explain why this change is being made..." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              <div className="flex space-x-2">
+                <Button type="submit" disabled={addTimeEntryMutation.isPending || updateTimeEntryMutation.isPending}>
+                  {editingEntry 
+                    ? <><CheckCircle2 className="mr-2 h-4 w-4" /> {updateTimeEntryMutation.isPending ? 'Updating...' : 'Update Entry'}</>
+                    : <><Plus className="mr-2 h-4 w-4" /> {addTimeEntryMutation.isPending ? 'Adding...' : 'Add Entry as Draft'}</>
+                  }
+                </Button>
+                {editingEntry && (
+                  <Button type="button" variant="outline" onClick={cancelEdit} disabled={updateTimeEntryMutation.isPending}>
+                    <XCircle className="mr-2 h-4 w-4" /> Cancel Edit
+                  </Button>
+                )}
+              </div>
             </form>
           </Form>
         </CardContent>
@@ -291,7 +455,7 @@ const TimeEntriesPage = () => {
       <Card>
         <CardHeader>
           <CardTitle>Your Time Entries</CardTitle>
-          <CardDescription>Manage your draft and submitted time entries.</CardDescription>
+          <CardDescription>Manage your draft and submitted time entries. You can edit draft entries.</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoadingEntries && <p>Loading entries...</p>}
@@ -316,9 +480,18 @@ const TimeEntriesPage = () => {
                       <p className="text-xs text-gray-500">Submitted on: {format(new Date(entry.submitted_at), "PPP p")}</p>
                     )}
                   </div>
-                  <div className="flex space-x-2 self-start sm:self-center">
+                  <div className="flex flex-wrap gap-2 self-start sm:self-center">
                     {!entry.is_finalized && (
                       <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(entry)}
+                          disabled={submitTimeEntryMutation.isPending || deleteTimeEntryMutation.isPending || updateTimeEntryMutation.isPending}
+                        >
+                          <Edit3 className="mr-1 h-4 w-4" />
+                          Edit
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
