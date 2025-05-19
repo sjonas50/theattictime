@@ -23,8 +23,8 @@ type TimeEntryRow = Tables<'time_entries'>;
 type EmployeeRow = Tables<'employees'>;
 
 // Define a type for the data we fetch (time entries with employee names)
-type ExportDataRow = TimeEntryRow & {
-  employees: Pick<EmployeeRow, 'name'> | null; // employees can be null if FK allows or join fails
+type ExportDataRow = Omit<TimeEntryRow, 'employee_id'> & { // Omit employee_id as we'll have the nested employee object
+  employees: Pick<EmployeeRow, 'name'> | null; 
 };
 
 const ExportPage = () => {
@@ -137,7 +137,7 @@ const ExportPage = () => {
 
   const handleExport = async () => {
     setIsExporting(true);
-    toast.info(`Preparing export for: ${exportPeriod}...`);
+    toast.info(`Preparing export for: ${exportPeriod.replace("_", " ")}...`);
 
     const { startDate, endDate } = getTargetDateRange();
     const formattedStartDate = formatDate(startDate, 'yyyy-MM-dd');
@@ -152,7 +152,7 @@ const ExportPage = () => {
         project_code,
         hours_worked,
         notes,
-        employees ( name )
+        employees!time_entries_employee_id_fkey ( name ) 
       `)
       .gte('entry_date', formattedStartDate)
       .lte('entry_date', formattedEndDate)
@@ -176,8 +176,8 @@ const ExportPage = () => {
     // Prepare data for CSV: Date, Employee Name, Job, Hours Worked, Notes
     const dataToExport = timeEntries.map(item => ({
       'Date': item.entry_date,
-      'Employee Name': item.employees?.name || 'N/A',
-      'Job': item.project_code, // As per user: project_code is Job
+      'Employee Name': item.employees?.name || 'N/A', // Accessing nested employee name
+      'Job': item.project_code,
       'Hours Worked': item.hours_worked,
       'Notes': item.notes || '',
     }));
