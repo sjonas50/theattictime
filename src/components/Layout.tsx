@@ -3,7 +3,7 @@ import { ReactNode } from 'react';
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Toaster } from '@/components/ui/sonner';
+// Toaster import removed as it's now global in App.tsx
 import { LogOut } from 'lucide-react';
 
 const Layout = ({ children }: { children?: ReactNode }) => {
@@ -13,10 +13,6 @@ const Layout = ({ children }: { children?: ReactNode }) => {
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
-
-  // If not loading and no user, redirect to auth page, unless already on auth page
-  // This check might be tricky if Layout wraps AuthPage itself.
-  // A better approach is a ProtectedRoute component.
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -39,7 +35,7 @@ const Layout = ({ children }: { children?: ReactNode }) => {
       <main className="flex-grow container mx-auto p-4">
         {children || <Outlet />}
       </main>
-      <Toaster richColors />
+      {/* Toaster component removed from here */}
     </div>
   );
 };
