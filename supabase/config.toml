@@ -6,3 +6,9 @@ project_id = "mpbwlrpzltkhagzgkbxn" # Do not change this line
 
 [functions.send-timesheet-reminders]
   verify_jwt = false # Called by pg_cron with anon key
+
+[functions.voice-transcription]
+  verify_jwt = true
+
+[functions.analyze-work-summary]
+  verify_jwt = true

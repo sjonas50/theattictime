@@ -16,6 +16,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Calendar as CalendarIcon, Plus, Trash2, CheckCircle2, Edit3, XCircle, Loader2 } from 'lucide-react';
+import VoiceReporter from '@/components/VoiceReporter';
+import VoiceAnalysisReview from '@/components/VoiceAnalysisReview';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
@@ -58,6 +60,8 @@ const TimeEntriesPage = () => {
   const queryClient = useQueryClient();
   const [employeeId, setEmployeeId] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
+  const [showVoiceAnalysis, setShowVoiceAnalysis] = useState(false);
+  const [voiceAnalysis, setVoiceAnalysis] = useState<any>(null);
 
   // Fetch employee_id for the current user
   useEffect(() => {
@@ -341,6 +345,32 @@ const TimeEntriesPage = () => {
     // form.reset() handled by useEffect
   };
 
+  const handleVoiceAnalysisComplete = (analysis: any) => {
+    setVoiceAnalysis(analysis);
+    setShowVoiceAnalysis(true);
+  };
+
+  const handleCreateEntriesFromVoice = async (entries: any[]) => {
+    const promises = entries.map(entry => {
+      const payload: AddTimeEntryVariables = {
+        project_code: entry.project_code,
+        hours_worked: entry.hours_worked,
+        entry_date: entry.entry_date,
+        notes: entry.notes || 'Created from voice report'
+      };
+      return addTimeEntryMutation.mutateAsync(payload);
+    });
+
+    await Promise.all(promises);
+    setShowVoiceAnalysis(false);
+    setVoiceAnalysis(null);
+  };
+
+  const handleCancelVoiceAnalysis = () => {
+    setShowVoiceAnalysis(false);
+    setVoiceAnalysis(null);
+  };
+
   if (!user) {
     return <p>Please sign in to manage time entries.</p>;
   }
@@ -357,6 +387,24 @@ const TimeEntriesPage = () => {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Manage Time Entries</h1>
+
+      {/* Voice Reporter */}
+      {employeeId && !showVoiceAnalysis && (
+        <VoiceReporter 
+          employeeId={employeeId} 
+          onAnalysisComplete={handleVoiceAnalysisComplete} 
+        />
+      )}
+
+      {/* Voice Analysis Review */}
+      {showVoiceAnalysis && voiceAnalysis && employeeId && (
+        <VoiceAnalysisReview
+          analysis={voiceAnalysis}
+          projectCodes={projectCodes || []}
+          onCreateEntries={handleCreateEntriesFromVoice}
+          onCancel={handleCancelVoiceAnalysis}
+        />
+      )}
 
       <Card>
         <CardHeader>
