@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Enums, Tables } from '@/integrations/supabase/types';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from 'sonner';
 import { Trash } from 'lucide-react';
@@ -63,6 +64,23 @@ const EmployeeManagementTable = () => {
       toast.error(`Failed to update roles: ${error.message}`);
     },
   });
+
+  const updateSupervisorMutation = useMutation({
+    mutationFn: async ({ employeeId, supervisorId }: { employeeId: string; supervisorId: string | null }) => {
+      const { error } = await supabase
+        .from('employees')
+        .update({ supervisor_id: supervisorId })
+        .eq('id', employeeId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Supervisor assignment updated successfully.');
+      queryClient.invalidateQueries({ queryKey: ['employees_admin'] });
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to update supervisor: ${error.message}`);
+    },
+  });
   
   const deleteEmployeeMutation = useMutation({
     mutationFn: async (employeeId: string) => {
@@ -119,6 +137,17 @@ const EmployeeManagementTable = () => {
     updateUserRolesMutation.mutate({ userId, newRoles });
   };
 
+  const handleSupervisorChange = (employeeId: string, supervisorId: string) => {
+    const finalSupervisorId = supervisorId === "none" ? null : supervisorId;
+    updateSupervisorMutation.mutate({ employeeId, supervisorId: finalSupervisorId });
+  };
+
+  // Get potential supervisors (employees with supervisor role)
+  const potentialSupervisors = employees?.filter(emp => {
+    const roles = getEmployeeRoles(emp.user_id);
+    return roles.includes('supervisor') || roles.includes('admin');
+  }) || [];
+
   return (
     <div className="overflow-x-auto">
       <Table>
@@ -127,6 +156,7 @@ const EmployeeManagementTable = () => {
             <TableHead>Name</TableHead>
             <TableHead>Internal ID</TableHead>
             <TableHead>User ID (Auth)</TableHead>
+            <TableHead>Supervisor</TableHead>
             {ALL_ROLES.map(role => <TableHead key={role} className="capitalize">{role}</TableHead>)}
             <TableHead>Actions</TableHead>
           </TableRow>
@@ -134,11 +164,33 @@ const EmployeeManagementTable = () => {
         <TableBody>
           {employees?.map(employee => {
             const currentRoles = getEmployeeRoles(employee.user_id);
+            const currentSupervisor = employees?.find(emp => emp.id === employee.supervisor_id);
             return (
               <TableRow key={employee.id}>
                 <TableCell>{employee.name}</TableCell>
                 <TableCell>{employee.employee_id_internal}</TableCell>
                 <TableCell>{employee.user_id}</TableCell>
+                <TableCell>
+                  <Select 
+                    value={employee.supervisor_id || "none"} 
+                    onValueChange={(value) => handleSupervisorChange(employee.id, value)}
+                    disabled={updateSupervisorMutation.isPending}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select supervisor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Supervisor</SelectItem>
+                      {potentialSupervisors
+                        .filter(supervisor => supervisor.id !== employee.id) // Can't supervise themselves
+                        .map(supervisor => (
+                          <SelectItem key={supervisor.id} value={supervisor.id}>
+                            {supervisor.name} ({supervisor.employee_id_internal})
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </TableCell>
                 {ALL_ROLES.map(role => {
                   const isSelfAdminRole = user && employee.user_id === user.id && role === 'admin';
                   return (
