@@ -63,22 +63,31 @@ const SupervisorDashboardPage = () => {
     }
   }, [user]);
 
-  // Fetch all time entries (RLS policies will filter for supervisor)
+  // Fetch time entries for employees supervised by this supervisor
   const { data: timeEntries, isLoading: isLoadingEntries } = useQuery<TimeEntry[], Error>({
-    queryKey: ['allTimeEntriesForSupervisor'],
+    queryKey: ['supervisedTimeEntries', employeeId],
     queryFn: async () => {
+      if (!employeeId) {
+        throw new Error("Supervisor employee ID not found");
+      }
+      
+      // Get time entries for employees supervised by this supervisor
       const { data, error } = await supabase
         .from('time_entries')
         .select(`
           *,
-          employees ( name ) 
-        `) // Fetch employee name
+          employees ( 
+            name,
+            supervisor_id
+          ) 
+        `)
+        .eq('employees.supervisor_id', employeeId) // Only entries from supervised employees
         .order('submitted_at', { ascending: true, nullsFirst: false }) // Show submitted entries needing action first
         .order('entry_date', { ascending: false });
       if (error) throw new Error(error.message);
       return data || [];
     },
-    enabled: isSupervisor, // Only fetch if the user is a supervisor
+    enabled: isSupervisor && !!employeeId, // Only fetch if the user is a supervisor and we have their employee ID
   });
 
   // Mutation to approve a time entry
