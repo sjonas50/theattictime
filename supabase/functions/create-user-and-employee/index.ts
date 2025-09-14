@@ -36,6 +36,21 @@ serve(async (req: Request) => {
     
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
+    // First check if user already exists
+    console.log(`Checking if user already exists for email: ${email}`);
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = existingUsers.users.find(user => user.email === email);
+    
+    if (existingUser) {
+      console.log(`User already exists with email: ${email}`);
+      return new Response(JSON.stringify({ 
+        error: 'A user with this email already exists. Please use a different email address or check if this employee has already been created.' 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 409,
+      });
+    }
+
     console.log(`Attempting to create auth user (invitation flow) for: ${email}`);
     const { data: authUserResponse, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
@@ -44,12 +59,6 @@ serve(async (req: Request) => {
 
     if (authError) {
       console.error('Error creating auth user:', authError.message);
-      if (authError.message.includes('User already registered') || (authError as any).status === 422) {
-        return new Response(JSON.stringify({ error: 'A user with this email already exists.' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 409,
-        });
-      }
       return new Response(JSON.stringify({ error: `Failed to create auth user: ${authError.message}` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
