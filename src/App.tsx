@@ -13,6 +13,7 @@ import TimeEntriesPage from "./pages/TimeEntriesPage";
 import SupervisorDashboardPage from "./pages/SupervisorDashboardPage";
 import AdminPage from "./pages/AdminPage";
 import ExportPage from "./pages/ExportPage"; // Import ExportPage
+import ReportsPage from "./pages/ReportsPage";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +31,7 @@ const App = () => (
               <Route path="/supervisor-dashboard" element={<SupervisorDashboardPage />} />
               <Route path="/admin" element={<AdminPage />} />
               <Route path="/exports" element={<ExportPage />} /> {/* Add ExportPage route */}
+              <Route path="/reports" element={<ReportsPage />} />
               {/* Add other protected routes here */}
             </Route>
             
