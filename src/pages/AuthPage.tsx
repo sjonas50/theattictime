@@ -1,7 +1,6 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,9 +11,55 @@ import { toast } from "sonner";
 const AuthPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    // Check if this is a password reset flow
+    const isPasswordReset = searchParams.get('reset') === 'true';
+    setIsResettingPassword(isPasswordReset);
+    
+    if (isPasswordReset) {
+      // Check for auth session - user should be logged in after clicking reset link
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session) {
+          toast.error('Password reset link is invalid or expired. Please request a new one.');
+          setIsResettingPassword(false);
+        }
+      });
+    }
+  }, [searchParams]);
+
+  const handlePasswordUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match.');
+      return;
+    }
+    
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters long.');
+      return;
+    }
+    
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success('Password updated successfully! You can now sign in with your new password.');
+      setIsResettingPassword(false);
+      navigate('/auth');
+    }
+    setLoading(false);
+  };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,7 +108,7 @@ const AuthPage = () => {
     }
     setForgotPasswordLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      // redirectTo: `${window.location.origin}/update-password` // Optional: if you have a custom update password page
+      redirectTo: `${window.location.origin}/auth?reset=true`
     });
     if (error) {
       toast.error(error.message);
@@ -72,6 +117,53 @@ const AuthPage = () => {
     }
     setForgotPasswordLoading(false);
   };
+
+  // Show password reset form if user came from reset link
+  if (isResettingPassword) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+        <Card className="w-[400px]">
+          <CardHeader>
+            <CardTitle>Reset Password</CardTitle>
+            <CardDescription>Enter your new password below.</CardDescription>
+          </CardHeader>
+          <form onSubmit={handlePasswordUpdate}>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-password">New Password</Label>
+                <Input 
+                  id="new-password" 
+                  type="password" 
+                  value={newPassword} 
+                  onChange={(e) => setNewPassword(e.target.value)} 
+                  placeholder="••••••••" 
+                  required 
+                  minLength={6}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm New Password</Label>
+                <Input 
+                  id="confirm-password" 
+                  type="password" 
+                  value={confirmPassword} 
+                  onChange={(e) => setConfirmPassword(e.target.value)} 
+                  placeholder="••••••••" 
+                  required 
+                  minLength={6}
+                />
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Updating Password...' : 'Update Password'}
+              </Button>
+            </CardFooter>
+          </form>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
@@ -146,4 +238,3 @@ const AuthPage = () => {
 };
 
 export default AuthPage;
-
