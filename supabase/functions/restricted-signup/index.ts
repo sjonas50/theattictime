@@ -73,10 +73,52 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('User created successfully:', data.user?.email);
 
+    // Create employee record for the new user
+    const employeeName = email.split('@')[0]; // Use email prefix as default name
+    const { data: employeeData, error: employeeError } = await supabaseAdmin
+      .from('employees')
+      .insert({
+        user_id: data.user!.id,
+        name: employeeName,
+        employee_id_internal: `EMP-${Date.now()}` // Generate a simple employee ID
+      })
+      .select()
+      .single();
+
+    if (employeeError) {
+      console.error('Error creating employee record:', employeeError);
+      // Try to cleanup the auth user if employee creation fails
+      await supabaseAdmin.auth.admin.deleteUser(data.user!.id);
+      return new Response(
+        JSON.stringify({ error: 'Failed to create employee record' }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        }
+      );
+    }
+
+    // Assign default 'employee' role
+    const { error: roleError } = await supabaseAdmin
+      .from('user_roles')
+      .insert({
+        user_id: data.user!.id,
+        role: 'employee'
+      });
+
+    if (roleError) {
+      console.error('Error assigning employee role:', roleError);
+      // Note: We don't rollback here as the user and employee are created
+      // An admin can manually assign roles later
+    }
+
+    console.log('Employee record created:', employeeData.name);
+
     return new Response(
       JSON.stringify({ 
-        message: 'User created successfully',
-        user: { id: data.user?.id, email: data.user?.email }
+        message: 'User and employee record created successfully',
+        user: { id: data.user?.id, email: data.user?.email },
+        employee: { id: employeeData.id, name: employeeData.name }
       }),
       {
         status: 200,
