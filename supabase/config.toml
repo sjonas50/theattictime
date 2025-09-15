@@ -12,3 +12,6 @@ project_id = "mpbwlrpzltkhagzgkbxn" # Do not change this line
 
 [functions.analyze-work-summary]
   verify_jwt = true
+
+[functions.restricted-signup]
+  verify_jwt = false # Public function for signup

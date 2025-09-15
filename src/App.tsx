@@ -35,10 +35,8 @@ const App = () => (
               {/* Add other protected routes here */}
             </Route>
             
-            {/* Public Routes with Layout */}
-            <Route element={<Layout><Outlet/></Layout>}>
-              <Route path="/auth" element={<AuthPage />} />
-            </Route>
+            {/* Public Routes */}
+            <Route path="/auth" element={<AuthPage />} />
 
             {/* Catch-all Not Found Route */}
             <Route path="*" element={<Layout><NotFound /></Layout>} /> 

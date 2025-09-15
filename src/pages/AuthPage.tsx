@@ -25,15 +25,27 @@ const AuthPage = () => {
     setIsResettingPassword(isPasswordReset);
     
     if (isPasswordReset) {
+      console.log('Password reset flow detected');
       // Check for auth session - user should be logged in after clicking reset link
       supabase.auth.getSession().then(({ data: { session } }) => {
+        console.log('Session during password reset:', session?.user?.email);
         if (!session) {
           toast.error('Password reset link is invalid or expired. Please request a new one.');
           setIsResettingPassword(false);
+        } else {
+          toast.info('Please enter your new password below.');
         }
       });
     }
-  }, [searchParams]);
+    
+    // Check if user is already logged in and redirect them
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session && !isPasswordReset) {
+        console.log('User already logged in, redirecting to home');
+        navigate('/');
+      }
+    });
+  }, [searchParams, navigate]);
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,26 +75,48 @@ const AuthPage = () => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!email || !password) {
+      toast.error('Please fill in all fields.');
+      return;
+    }
+
+    if (password.length < 6) {
+      toast.error('Password must be at least 6 characters long.');
+      return;
+    }
+
+    const emailDomain = email.split('@')[1]?.toLowerCase();
+    if (emailDomain !== 'theattic.ai') {
+      toast.error('Sign up is restricted to @theattic.ai email addresses only.');
+      return;
+    }
+
     setLoading(true);
+    console.log('Attempting signup for:', email);
     
     try {
       const { data, error } = await supabase.functions.invoke('restricted-signup', {
         body: { email, password }
       });
 
+      console.log('Signup response:', { data, error });
+
       if (error) {
-        toast.error(error.message);
+        console.error('Supabase function error:', error);
+        toast.error(error.message || 'Failed to create account. Please try again.');
       } else if (data?.error) {
+        console.error('Function returned error:', data.error);
         toast.error(data.error);
       } else {
         toast.success('Account created successfully! You can now sign in.');
-        // Clear the form
+        // Clear the form and switch to sign in tab
         setEmail('');
         setPassword('');
       }
     } catch (error: any) {
-      toast.error('An unexpected error occurred. Please try again.');
       console.error('Signup error:', error);
+      toast.error('An unexpected error occurred. Please try again.');
     }
     
     setLoading(false);
@@ -90,12 +124,30 @@ const AuthPage = () => {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!email || !password) {
+      toast.error('Please fill in all fields.');
+      return;
+    }
+
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    console.log('Attempting sign in for:', email);
+    
+    const { error } = await supabase.auth.signInWithPassword({ 
+      email, 
+      password 
+    });
+    
     if (error) {
-      toast.error(error.message);
+      console.error('Sign in error:', error);
+      if (error.message.includes('Invalid login credentials')) {
+        toast.error('Invalid email or password. Please check your credentials and try again.');
+      } else {
+        toast.error(error.message);
+      }
     } else {
       toast.success('Sign in successful!');
+      console.log('Sign in successful, navigating to home');
       navigate('/');
     }
     setLoading(false);
@@ -106,14 +158,25 @@ const AuthPage = () => {
       toast.error('Please enter your email address.');
       return;
     }
+
+    const emailDomain = email.split('@')[1]?.toLowerCase();
+    if (emailDomain !== 'theattic.ai') {
+      toast.error('Password reset is only available for @theattic.ai email addresses.');
+      return;
+    }
+
     setForgotPasswordLoading(true);
+    console.log('Sending password reset for:', email);
+    
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth?reset=true`
     });
+    
     if (error) {
+      console.error('Password reset error:', error);
       toast.error(error.message);
     } else {
-      toast.success('If an account exists for this email, a password reset link has been sent.');
+      toast.success('If an account exists for this email, a password reset link has been sent. Please check your email.');
     }
     setForgotPasswordLoading(false);
   };
