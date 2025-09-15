@@ -53,27 +53,9 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Check if user already exists
-    const { data: existingUser } = await supabaseAdmin.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000 // Should be enough for most cases
-    });
+    console.log('Attempting to create user for email:', email);
 
-    const userExists = existingUser.users.find(user => user.email === email);
-
-    if (userExists) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'A user with this email address has already been registered. Please sign in instead.' 
-        }),
-        {
-          status: 409, // Conflict status code
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        }
-      );
-    }
-
-    // Create the user
+    // Create the user directly - Supabase will handle the duplicate check
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
@@ -82,6 +64,20 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (error) {
       console.error('Error creating user:', error);
+      
+      // Handle the specific case of user already existing
+      if (error.message.includes('already been registered')) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'A user with this email address has already been registered. Please sign in instead.' 
+          }),
+          {
+            status: 409, // Conflict status code
+            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          }
+        );
+      }
+      
       return new Response(
         JSON.stringify({ error: error.message }),
         {
