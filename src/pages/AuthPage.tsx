@@ -19,12 +19,27 @@ const AuthPage = () => {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success('Sign up successful! Please check your email to verify your account.');
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('restricted-signup', {
+        body: { email, password }
+      });
+
+      if (error) {
+        toast.error(error.message);
+      } else if (data?.error) {
+        toast.error(data.error);
+      } else {
+        toast.success('Account created successfully! You can now sign in.');
+        // Clear the form
+        setEmail('');
+        setPassword('');
+      }
+    } catch (error: any) {
+      toast.error('An unexpected error occurred. Please try again.');
+      console.error('Signup error:', error);
     }
+    
     setLoading(false);
   };
 
@@ -108,10 +123,10 @@ const AuthPage = () => {
             </CardHeader>
             <form onSubmit={handleSignUp}>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email-signup">Email</Label>
-                  <Input id="email-signup" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="m@example.com" required />
-                </div>
+                 <div className="space-y-2">
+                   <Label htmlFor="email-signup">Email (must be @theattic.ai)</Label>
+                   <Input id="email-signup" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@theattic.ai" required />
+                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password-signup">Password</Label>
                   <Input id="password-signup" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
