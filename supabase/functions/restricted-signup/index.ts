@@ -53,6 +53,26 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Check if user already exists
+    const { data: existingUser } = await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000 // Should be enough for most cases
+    });
+
+    const userExists = existingUser.users.find(user => user.email === email);
+
+    if (userExists) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'A user with this email address has already been registered. Please sign in instead.' 
+        }),
+        {
+          status: 409, // Conflict status code
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        }
+      );
+    }
+
     // Create the user
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
