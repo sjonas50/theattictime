@@ -20,31 +20,53 @@ const AuthPage = () => {
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
-    // Check if this is a password reset flow
-    const isPasswordReset = searchParams.get('reset') === 'true';
-    setIsResettingPassword(isPasswordReset);
-    
-    if (isPasswordReset) {
-      console.log('Password reset flow detected');
-      // Check for auth session - user should be logged in after clicking reset link
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        console.log('Session during password reset:', session?.user?.email);
-        if (!session) {
-          toast.error('Password reset link is invalid or expired. Please request a new one.');
+    const process = async () => {
+      const url = new URL(window.location.href);
+
+      // Detect recovery redirect from Supabase (supports both new code flow and hash tokens)
+      const hasResetFlag = searchParams.get('reset') === 'true';
+      const typeParam = searchParams.get('type') || (url.hash.match(/type=([^&]+)/)?.[1] ?? null);
+      const hasCode = !!searchParams.get('code');
+      const hasAccessToken = url.hash.includes('access_token');
+      const isRecovery = typeParam === 'recovery';
+
+      const shouldProcessRecovery = hasResetFlag || isRecovery || hasCode || hasAccessToken;
+
+      if (shouldProcessRecovery) {
+        setIsResettingPassword(true);
+        try {
+          // Supabase v2 PKCE: exchange the code/hash for a session
+          const { data, error } = await supabase.auth.exchangeCodeForSession(url.toString());
+          if (error) {
+            console.error('exchangeCodeForSession error:', error);
+          }
+
+          const { data: sessionData } = await supabase.auth.getSession();
+          const session = sessionData.session;
+
+          if (!session) {
+            toast.error('Password reset link is invalid or expired. Please request a new one.');
+            setIsResettingPassword(false);
+          } else {
+            toast.info('Please enter your new password below.');
+          }
+        } catch (err) {
+          console.error('Recovery processing error:', err);
+          toast.error('Failed to process recovery link. Please try again.');
           setIsResettingPassword(false);
-        } else {
-          toast.info('Please enter your new password below.');
         }
-      });
-    }
-    
-    // Check if user is already logged in and redirect them
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session && !isPasswordReset) {
+        return; // Skip normal redirect logic during recovery
+      }
+
+      // Check if user is already logged in and redirect them
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
         console.log('User already logged in, redirecting to home');
         navigate('/');
       }
-    });
+    };
+
+    process();
   }, [searchParams, navigate]);
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
