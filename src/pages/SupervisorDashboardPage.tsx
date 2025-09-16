@@ -72,11 +72,12 @@ const SupervisorDashboardPage = () => {
       }
       
       // Get time entries for employees supervised by this supervisor
+      // The RLS policies will now correctly filter to only show entries from supervised employees
       const { data, error } = await supabase
         .from('time_entries')
         .select(`
           *,
-          employees ( 
+          employees!inner ( 
             name,
             supervisor_id
           ) 
@@ -112,7 +113,7 @@ const SupervisorDashboardPage = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['allTimeEntriesForSupervisor'] });
+      queryClient.invalidateQueries({ queryKey: ['supervisedTimeEntries'] });
       toast.success('Time entry approved!');
     },
     onError: (error) => {
@@ -144,7 +145,7 @@ const SupervisorDashboardPage = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['allTimeEntriesForSupervisor'] });
+      queryClient.invalidateQueries({ queryKey: ['supervisedTimeEntries'] });
       toast.success('Time entry rejected!');
     },
     onError: (error) => {
