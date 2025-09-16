@@ -9,6 +9,9 @@ import { format, startOfWeek, startOfMonth } from 'date-fns';
 import { Clock, Users, CheckCircle, AlertCircle, TrendingUp, Calendar, Target, BarChart3 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { OfflineIndicator } from '@/components/OfflineIndicator';
+import { useNotifications } from '@/hooks/useNotifications';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 type UserRole = 'admin' | 'supervisor' | 'employee';
 
@@ -16,6 +19,8 @@ const Index = () => {
   const { user } = useAuth();
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [isLoadingRoles, setIsLoadingRoles] = useState(true);
+  const isMobile = useIsMobile();
+  const { scheduleDailyReminder, checkMissingEntries } = useNotifications();
 
   // Fetch user roles
   useEffect(() => {
@@ -43,6 +48,17 @@ const Index = () => {
 
     fetchUserRoles();
   }, [user]);
+
+  // Set up notifications when user roles are loaded
+  useEffect(() => {
+    if (user && !isLoadingRoles) {
+      scheduleDailyReminder();
+      
+      // Check for missing entries every hour during work hours
+      const interval = setInterval(checkMissingEntries, 60 * 60 * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [user, isLoadingRoles, scheduleDailyReminder, checkMissingEntries]);
 
   // Fetch employee data for current user
   const { data: currentEmployee } = useQuery({
@@ -221,17 +237,18 @@ const Index = () => {
   const isEmployee = userRoles.length === 0 || userRoles.includes('employee');
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <div className="flex gap-2">
-          {userRoles.map(role => (
-            <Badge key={role} variant="secondary" className="capitalize">
-              {role}
-            </Badge>
-          ))}
+    <>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <div className="flex gap-2">
+            {userRoles.map(role => (
+              <Badge key={role} variant="secondary" className="capitalize">
+                {role}
+              </Badge>
+            ))}
+          </div>
         </div>
-      </div>
 
       {/* Enhanced Admin Dashboard */}
       {isAdmin && systemStats && (
@@ -512,7 +529,9 @@ const Index = () => {
           )}
         </div>
       )}
-    </div>
+      </div>
+      <OfflineIndicator />
+    </>
   );
 };
 

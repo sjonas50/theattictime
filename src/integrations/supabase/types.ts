@@ -92,11 +92,14 @@ export type Database = {
           hours_worked: number
           id: string
           is_finalized: boolean
+          local_id: string | null
           notes: string | null
+          offline_created_at: string | null
           project_code: string
           rejected_at: string | null
           rejection_reason: string | null
           submitted_at: string | null
+          sync_status: string | null
           updated_at: string
         }
         Insert: {
@@ -108,11 +111,14 @@ export type Database = {
           hours_worked: number
           id?: string
           is_finalized?: boolean
+          local_id?: string | null
           notes?: string | null
+          offline_created_at?: string | null
           project_code: string
           rejected_at?: string | null
           rejection_reason?: string | null
           submitted_at?: string | null
+          sync_status?: string | null
           updated_at?: string
         }
         Update: {
@@ -124,11 +130,14 @@ export type Database = {
           hours_worked?: number
           id?: string
           is_finalized?: boolean
+          local_id?: string | null
           notes?: string | null
+          offline_created_at?: string | null
           project_code?: string
           rejected_at?: string | null
           rejection_reason?: string | null
           submitted_at?: string | null
+          sync_status?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -210,6 +219,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_preferences: {
+        Row: {
+          created_at: string
+          daily_reminder_time: string | null
+          id: string
+          notification_enabled: boolean
+          offline_sync_enabled: boolean
+          timezone: string | null
+          updated_at: string
+          user_id: string
+          weekly_reminder_enabled: boolean
+          work_days: number[] | null
+        }
+        Insert: {
+          created_at?: string
+          daily_reminder_time?: string | null
+          id?: string
+          notification_enabled?: boolean
+          offline_sync_enabled?: boolean
+          timezone?: string | null
+          updated_at?: string
+          user_id: string
+          weekly_reminder_enabled?: boolean
+          work_days?: number[] | null
+        }
+        Update: {
+          created_at?: string
+          daily_reminder_time?: string | null
+          id?: string
+          notification_enabled?: boolean
+          offline_sync_enabled?: boolean
+          timezone?: string | null
+          updated_at?: string
+          user_id?: string
+          weekly_reminder_enabled?: boolean
+          work_days?: number[] | null
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
