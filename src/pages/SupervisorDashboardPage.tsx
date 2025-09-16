@@ -17,6 +17,7 @@ const SupervisorDashboardPage = () => {
   const queryClient = useQueryClient();
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [isSupervisor, setIsSupervisor] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [employeeId, setEmployeeId] = useState<string | null>(null);
 
   // Fetch current user's employee ID (supervisors are also employees)
@@ -57,22 +58,39 @@ const SupervisorDashboardPage = () => {
           const roles = data.map(r => r.role as UserRole);
           setUserRoles(roles);
           setIsSupervisor(roles.includes('supervisor'));
+          setIsAdmin(roles.includes('admin'));
         }
       };
       fetchUserRoles();
     }
   }, [user]);
 
-  // Fetch time entries for employees supervised by this supervisor
+  // Fetch time entries for review (admin sees all; supervisor sees their team)
   const { data: timeEntries, isLoading: isLoadingEntries } = useQuery<TimeEntry[], Error>({
-    queryKey: ['supervisedTimeEntries', employeeId],
+    queryKey: ['reviewTimeEntries', isAdmin, employeeId],
     queryFn: async () => {
+      // Admin: see all entries
+      if (isAdmin) {
+        const { data, error } = await supabase
+          .from('time_entries')
+          .select(`
+            *,
+            employees!inner (
+              name,
+              supervisor_id
+            )
+          `)
+          .order('submitted_at', { ascending: true, nullsFirst: false })
+          .order('entry_date', { ascending: false });
+        if (error) throw new Error(error.message);
+        return data || [];
+      }
+
+      // Supervisor: only team entries
       if (!employeeId) {
         throw new Error("Supervisor employee ID not found");
       }
-      
-      // Get time entries for employees supervised by this supervisor
-      // The RLS policies will now correctly filter to only show entries from supervised employees
+
       const { data, error } = await supabase
         .from('time_entries')
         .select(`
@@ -82,23 +100,23 @@ const SupervisorDashboardPage = () => {
             supervisor_id
           ) 
         `)
-        .eq('employees.supervisor_id', employeeId) // Only entries from supervised employees
-        .order('submitted_at', { ascending: true, nullsFirst: false }) // Show submitted entries needing action first
+        .eq('employees.supervisor_id', employeeId)
+        .order('submitted_at', { ascending: true, nullsFirst: false })
         .order('entry_date', { ascending: false });
       if (error) throw new Error(error.message);
       return data || [];
     },
-    enabled: isSupervisor && !!employeeId, // Only fetch if the user is a supervisor and we have their employee ID
+    enabled: isAdmin || (isSupervisor && !!employeeId),
   });
 
   // Mutation to approve a time entry
   const approveTimeEntryMutation = useMutation<TimeEntry, Error, string>({
     mutationFn: async (entryId) => {
-      if (!employeeId) throw new Error("Supervisor employee ID not found.");
+      if (!employeeId && !isAdmin) throw new Error("Supervisor employee ID not found.");
       const updates: TablesUpdate<'time_entries'> = {
         is_finalized: true, // Should already be true if submitted
         approved_at: new Date().toISOString(),
-        approved_by_supervisor_id: employeeId,
+        approved_by_supervisor_id: employeeId ?? null,
         rejected_at: null, // Clear any previous rejection
         rejection_reason: null,
       };
@@ -113,7 +131,7 @@ const SupervisorDashboardPage = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['supervisedTimeEntries'] });
+      queryClient.invalidateQueries({ queryKey: ['reviewTimeEntries'] });
       toast.success('Time entry approved!');
     },
     onError: (error) => {
@@ -145,7 +163,7 @@ const SupervisorDashboardPage = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['supervisedTimeEntries'] });
+      queryClient.invalidateQueries({ queryKey: ['reviewTimeEntries'] });
       toast.success('Time entry rejected!');
     },
     onError: (error) => {
@@ -169,12 +187,12 @@ const SupervisorDashboardPage = () => {
     return <p>Please sign in.</p>;
   }
 
-  if (userRoles.length === 0 && !isSupervisor) { // Still loading roles or not a supervisor
+  if (userRoles.length === 0 && !isAdmin && !isSupervisor) { // Still loading roles
      return <p>Loading user data or unauthorized...</p>;
   }
 
-  if (!isSupervisor) {
-    return <p>Access Denied. This page is for supervisors only.</p>;
+  if (!isAdmin && !isSupervisor) {
+    return <p>Access Denied. This page is for supervisors or admins only.</p>;
   }
   
   const entriesToReview = timeEntries?.filter(entry => entry.is_finalized && !entry.approved_at && !entry.rejected_at);
