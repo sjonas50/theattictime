@@ -3,9 +3,10 @@ import { ReactNode, useState, useEffect } from 'react';
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { supabase } from '@/integrations/supabase/client';
 import { Enums } from '@/integrations/supabase/types';
-import { LogOut, List, ShieldAlert, UserCog, Download, BarChart3 } from 'lucide-react'; // Added Download and BarChart3 icons
+import { LogOut, List, ShieldAlert, UserCog, Download, BarChart3 } from 'lucide-react';
 
 type UserRole = Enums<'app_role'>;
 
@@ -75,15 +76,19 @@ const Layout = ({ children }: { children?: ReactNode }) => {
                 <Button onClick={() => navigate('/reports')} variant="ghost" className="text-white hover:bg-gray-700 px-2 md:px-3">
                   <BarChart3 className="mr-1 md:mr-2 h-4 w-4" /> Reports
                 </Button>
+                <ThemeToggle />
                 <Button onClick={signOut} variant="ghost" className="text-white hover:bg-gray-700 px-2 md:px-3">
                   <LogOut className="mr-1 md:mr-2 h-4 w-4" /> Sign Out
                 </Button>
               </>
             )}
             {!user && (
-              <Button onClick={() => navigate('/auth')} variant="outline" className="text-white border-white hover:bg-gray-700">
-                Sign In
-              </Button>
+              <>
+                <ThemeToggle />
+                <Button onClick={() => navigate('/auth')} variant="outline" className="text-white border-white hover:bg-gray-700">
+                  Sign In
+                </Button>
+              </>
             )}
           </nav>
         </div>
