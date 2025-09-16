@@ -291,31 +291,34 @@ const Index = () => {
       {/* Supervisor Dashboard */}
       {isSupervisor && teamStats && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
+          <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-950/20 dark:to-indigo-900/20 border-indigo-200 dark:border-indigo-800">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Team Size</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-indigo-700 dark:text-indigo-300">Team Size</CardTitle>
+              <Users className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{teamStats.teamSize}</div>
+              <div className="text-2xl font-bold text-indigo-900 dark:text-indigo-100">{teamStats.teamSize}</div>
+              <div className="text-xs text-indigo-600 dark:text-indigo-400 mt-1">Direct reports</div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-950/20 dark:to-teal-900/20 border-teal-200 dark:border-teal-800">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Team Hours (Week)</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-teal-700 dark:text-teal-300">Team Hours (Week)</CardTitle>
+              <Clock className="h-4 w-4 text-teal-600 dark:text-teal-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{teamStats.totalHours.toFixed(1)}</div>
+              <div className="text-2xl font-bold text-teal-900 dark:text-teal-100">{teamStats.totalHours.toFixed(1)}h</div>
+              <div className="text-xs text-teal-600 dark:text-teal-400 mt-1">Combined effort</div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/20 dark:to-orange-900/20 border-orange-200 dark:border-orange-800">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Reviews</CardTitle>
-              <AlertCircle className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-orange-700 dark:text-orange-300">Pending Reviews</CardTitle>
+              <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{teamStats.pendingEntries}</div>
+              <div className="text-2xl font-bold text-orange-900 dark:text-orange-100">{teamStats.pendingEntries}</div>
+              <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">Need attention</div>
             </CardContent>
           </Card>
         </div>
