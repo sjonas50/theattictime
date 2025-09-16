@@ -109,8 +109,12 @@ const TimeTrackingReports = () => {
         .from('time_entries')
         .select('*')
         .gte('entry_date', startDate)
-        .lte('entry_date', endDate)
-        .eq('is_finalized', true);
+        .lte('entry_date', endDate);
+      
+      // Only filter for finalized entries if user is not admin
+      if (!userRoles.includes('admin')) {
+        query = query.eq('is_finalized', true);
+      }
 
       // Apply employee filter if needed
       if (employeeFilter) {
