@@ -68,16 +68,15 @@ const handler = async (req: Request): Promise<Response> => {
       // Handle the specific case of user already existing
       if ((error as any).code === 'email_exists' || error.message.includes('already been registered')) {
         try {
-          const origin = req.headers.get('origin') ?? Deno.env.get('SITE_URL') ?? '';
-
-          // Use a public client to trigger the password reset email
+          // Use the configured site URL for redirect
+          const redirectTo = 'https://theattictime.lovable.app/auth?reset=true';
           const supabasePublic = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
             Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY') ?? ''
           );
 
           const { error: resetError } = await supabasePublic.auth.resetPasswordForEmail(email, {
-            redirectTo: origin ? `${origin}/auth?reset=true` : undefined,
+            redirectTo: redirectTo,
           });
 
           if (resetError) {
