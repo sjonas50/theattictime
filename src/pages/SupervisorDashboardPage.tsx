@@ -215,14 +215,14 @@ const SupervisorDashboardPage = () => {
           {!isLoadingEntries && entriesToReview && entriesToReview.length > 0 && (
             <ul className="space-y-4">
               {entriesToReview.map((entry) => (
-                <li key={entry.id} className="p-4 border rounded-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-yellow-50 border-yellow-200">
+                <li key={entry.id} className="p-4 border rounded-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-secondary/50 border-secondary">
                   <div>
                     {/* @ts-expect-error employees is not directly on TimeEntry type but fetched via join */}
                     <p className="font-semibold">Employee: {entry.employees?.name || 'N/A'} (Project: {entry.project_code})</p>
                     <p className="text-sm">Date: {format(new Date(entry.entry_date), "PPP")}</p>
                     <p className="text-sm">Hours: {entry.hours_worked}</p>
                     {entry.notes && <p className="text-sm text-muted-foreground">Notes: {entry.notes}</p>}
-                     {entry.submitted_at && <p className="text-xs text-gray-500">Submitted: {format(new Date(entry.submitted_at), "PPP p")}</p>}
+                     {entry.submitted_at && <p className="text-xs text-muted-foreground">Submitted: {format(new Date(entry.submitted_at), "PPP p")}</p>}
                   </div>
                   <div className="flex space-x-2 self-start sm:self-center">
                     <Button
@@ -263,10 +263,10 @@ const SupervisorDashboardPage = () => {
           {!isLoadingEntries && approvedEntries && approvedEntries.length > 0 && (
             <ul className="space-y-2">
               {approvedEntries.slice(0, 5).map(entry => ( // Show last 5
-                <li key={entry.id} className="p-3 border rounded-md bg-green-50 border-green-200">
+                <li key={entry.id} className="p-3 border rounded-md bg-green-500/10 border-green-500/20 dark:bg-green-500/20 dark:border-green-500/30">
                   {/* @ts-expect-error employees is not directly on TimeEntry type but fetched via join */}
                   <p className="font-medium">Employee: {entry.employees?.name || 'N/A'} (Project: {entry.project_code}) - {entry.hours_worked} hrs on {format(new Date(entry.entry_date), "PPP")}</p>
-                  {entry.approved_at && <p className="text-xs text-gray-600">Approved: {format(new Date(entry.approved_at), "PPP p")}</p>}
+                  {entry.approved_at && <p className="text-xs text-muted-foreground">Approved: {format(new Date(entry.approved_at), "PPP p")}</p>}
                 </li>
               ))}
             </ul>
@@ -285,11 +285,11 @@ const SupervisorDashboardPage = () => {
           {!isLoadingEntries && rejectedEntries && rejectedEntries.length > 0 && (
             <ul className="space-y-2">
               {rejectedEntries.slice(0, 5).map(entry => ( // Show last 5
-                <li key={entry.id} className="p-3 border rounded-md bg-red-50 border-red-200">
+                <li key={entry.id} className="p-3 border rounded-md bg-red-500/10 border-red-500/20 dark:bg-red-500/20 dark:border-red-500/30">
                   {/* @ts-expect-error employees is not directly on TimeEntry type but fetched via join */}
                   <p className="font-medium">Employee: {entry.employees?.name || 'N/A'} (Project: {entry.project_code}) - {entry.hours_worked} hrs on {format(new Date(entry.entry_date), "PPP")}</p>
-                  {entry.rejected_at && <p className="text-xs text-gray-600">Rejected: {format(new Date(entry.rejected_at), "PPP p")}</p>}
-                  {entry.rejection_reason && <p className="text-xs text-red-700">Reason: {entry.rejection_reason}</p>}
+                  {entry.rejected_at && <p className="text-xs text-muted-foreground">Rejected: {format(new Date(entry.rejected_at), "PPP p")}</p>}
+                  {entry.rejection_reason && <p className="text-xs text-red-600 dark:text-red-400">Reason: {entry.rejection_reason}</p>}
                 </li>
               ))}
             </ul>
