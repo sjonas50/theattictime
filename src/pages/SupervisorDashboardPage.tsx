@@ -73,9 +73,9 @@ const SupervisorDashboardPage = () => {
       if (isAdmin) {
         const { data, error } = await supabase
           .from('time_entries')
-          .select(`
+        .select(`
             *,
-            employees!inner (
+            employees:employees!time_entries_employee_id_fkey!inner (
               name,
               supervisor_id
             )
@@ -95,7 +95,7 @@ const SupervisorDashboardPage = () => {
         .from('time_entries')
         .select(`
           *,
-          employees!inner ( 
+          employees:employees!time_entries_employee_id_fkey!inner ( 
             name,
             supervisor_id
           ) 
