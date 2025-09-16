@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { Calendar as CalendarIcon, Plus, Trash2, CheckCircle2, Edit3, XCircle, Loader2 } from 'lucide-react';
 import VoiceReporter from '@/components/VoiceReporter';
 import VoiceAnalysisReview from '@/components/VoiceAnalysisReview';
+import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
@@ -548,7 +549,6 @@ const TimeEntriesPage = () => {
             </Form>
           </CardContent>
         </Card>
-      )}
 
       <Card>
         <CardHeader>
@@ -620,6 +620,7 @@ const TimeEntriesPage = () => {
           )}
         </CardContent>
       </Card>
+      </div>
       <OfflineIndicator />
     </>
   );
