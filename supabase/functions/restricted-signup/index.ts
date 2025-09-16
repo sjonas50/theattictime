@@ -66,16 +66,54 @@ const handler = async (req: Request): Promise<Response> => {
       console.error('Error creating user:', error);
       
       // Handle the specific case of user already existing
-      if (error.message.includes('already been registered')) {
-        return new Response(
-          JSON.stringify({ 
-            error: 'A user with this email address has already been registered. Please sign in instead.' 
-          }),
-          {
-            status: 409, // Conflict status code
-            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      if ((error as any).code === 'email_exists' || error.message.includes('already been registered')) {
+        try {
+          const origin = req.headers.get('origin') ?? Deno.env.get('SITE_URL') ?? '';
+
+          // Use a public client to trigger the password reset email
+          const supabasePublic = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY') ?? ''
+          );
+
+          const { error: resetError } = await supabasePublic.auth.resetPasswordForEmail(email, {
+            redirectTo: origin ? `${origin}/auth?reset=true` : undefined,
+          });
+
+          if (resetError) {
+            console.error('Failed to send password reset email:', resetError);
+            return new Response(
+              JSON.stringify({
+                error: 'An account already exists for this email. Please use "Forgot password" to reset your password.'
+              }),
+              {
+                status: 409, // Conflict status code
+                headers: { 'Content-Type': 'application/json', ...corsHeaders },
+              }
+            );
           }
-        );
+
+          return new Response(
+            JSON.stringify({
+              message: 'An account already exists. A password reset link has been sent to your email if it is valid.'
+            }),
+            {
+              status: 200,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            }
+          );
+        } catch (existingUserError) {
+          console.error('Error while handling existing user case:', existingUserError);
+          return new Response(
+            JSON.stringify({
+              error: 'Account exists. Please use "Forgot password" to reset your password.'
+            }),
+            {
+              status: 409,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            }
+          );
+        }
       }
       
       return new Response(
