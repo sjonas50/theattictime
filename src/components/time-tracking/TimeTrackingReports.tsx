@@ -135,10 +135,20 @@ const TimeTrackingReports = () => {
 
       if (empError) throw empError;
 
+      // Get project details for all entries
+      const projectCodes = [...new Set(entries.map(e => e.project_code))];
+      const { data: projects, error: projError } = await supabase
+        .from('project_codes')
+        .select('code, name')
+        .in('code', projectCodes);
+
+      if (projError) throw projError;
+
       // Combine data
       const enrichedEntries = entries.map(entry => ({
         ...entry,
-        employees: employees?.find(emp => emp.id === entry.employee_id) || null
+        employees: employees?.find(emp => emp.id === entry.employee_id) || null,
+        project: projects?.find(proj => proj.code === entry.project_code) || null
       }));
 
       return enrichedEntries;
@@ -198,10 +208,14 @@ const TimeTrackingReports = () => {
     
     const projectMap = new Map();
     timeEntries.forEach(entry => {
-      const key = entry.project_code;
+      const projectCode = entry.project_code;
+      const projectName = entry.project?.name || entry.project_code;
+      const key = projectCode;
+      
       if (!projectMap.has(key)) {
         projectMap.set(key, {
-          project_code: key,
+          project_code: projectCode,
+          project_name: projectName,
           totalHours: 0,
           employees: new Set(),
           entries: 0
@@ -329,7 +343,7 @@ const TimeTrackingReports = () => {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ project_code, percentage }) => `${project_code} (${percentage}%)`}
+                label={({ project_name, percentage }) => `${project_name} (${percentage}%)`}
                 outerRadius={80}
                 fill="#8884d8"
                 dataKey="totalHours"
@@ -389,19 +403,21 @@ const TimeTrackingReports = () => {
       </CardHeader>
       <CardContent>
         <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Project Code</TableHead>
-              <TableHead>Total Hours</TableHead>
-              <TableHead>Employees</TableHead>
-              <TableHead>Entries</TableHead>
-              <TableHead>Avg Hours/Entry</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {projectBreakdown.map((project, index) => (
-              <TableRow key={index}>
-                <TableCell className="font-medium">{project.project_code}</TableCell>
+           <TableHeader>
+             <TableRow>
+               <TableHead>Project Name</TableHead>
+               <TableHead>Project Code</TableHead>
+               <TableHead>Total Hours</TableHead>
+               <TableHead>Employees</TableHead>
+               <TableHead>Entries</TableHead>
+               <TableHead>Avg Hours/Entry</TableHead>
+             </TableRow>
+           </TableHeader>
+           <TableBody>
+             {projectBreakdown.map((project, index) => (
+               <TableRow key={index}>
+                 <TableCell className="font-medium">{project.project_name}</TableCell>
+                 <TableCell className="text-muted-foreground">{project.project_code}</TableCell>
                 <TableCell>
                   <Badge variant="secondary">{project.totalHours.toFixed(1)}h</Badge>
                 </TableCell>
