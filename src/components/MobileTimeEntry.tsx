@@ -1,5 +1,6 @@
 import React from 'react';
 import { useForm } from 'react-hook-form';
+import { getCurrentMountainDate } from '@/lib/timezone';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -56,7 +57,7 @@ export function MobileTimeEntry({
     resolver: zodResolver(timeEntrySchema),
     defaultValues: {
       hours_worked: initialValues?.hours_worked || 0,
-      entry_date: initialValues?.entry_date || new Date().toISOString().split('T')[0],
+      entry_date: initialValues?.entry_date || getCurrentMountainDate(),
       project_code: initialValues?.project_code || '',
       notes: initialValues?.notes || '',
     },

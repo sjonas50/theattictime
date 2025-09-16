@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Check, X, Edit3, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tables } from '@/integrations/supabase/types';
+import { getCurrentMountainDate } from '@/lib/timezone';
 
 interface AnalysisEntry {
   project_code: string;
@@ -54,7 +55,7 @@ const VoiceAnalysisReview: React.FC<VoiceAnalysisReviewProps> = ({
     const newEntry: AnalysisEntry = {
       project_code: '',
       hours_worked: 0,
-      entry_date: new Date().toISOString().split('T')[0],
+      entry_date: getCurrentMountainDate(),
       notes: '',
       confidence: 1.0
     };

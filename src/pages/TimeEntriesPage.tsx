@@ -21,6 +21,7 @@ import VoiceAnalysisReview from '@/components/VoiceAnalysisReview';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { getCurrentMountainDate, getMountainTimeForDB } from '@/lib/timezone';
 
 // Update the form schema to include modification_reason (optional for new, required for edit)
 const timeEntrySchema = z.object({
@@ -107,7 +108,7 @@ const TimeEntriesPage = () => {
       project_code: '',
       hours_worked: 0,
       notes: '',
-      entry_date: new Date(),
+      entry_date: new Date(getCurrentMountainDate()),
       modification_reason: '',
     },
   });
@@ -126,7 +127,7 @@ const TimeEntriesPage = () => {
         project_code: '',
         hours_worked: 0,
         notes: '',
-        entry_date: new Date(),
+        entry_date: new Date(getCurrentMountainDate()),
         modification_reason: '',
       });
     }
@@ -196,7 +197,7 @@ const TimeEntriesPage = () => {
         hours_worked: updatedValues.hours_worked,
         notes: updatedValues.notes,
         entry_date: updatedValues.entry_date,
-        updated_at: new Date().toISOString(),
+        updated_at: getMountainTimeForDB(),
       };
 
       const { data: updatedEntry, error: updateError } = await supabase
@@ -255,7 +256,7 @@ const TimeEntriesPage = () => {
     mutationFn: async (entryId) => {
       const updates: TablesUpdate<'time_entries'> = {
         is_finalized: true,
-        submitted_at: new Date().toISOString(),
+        submitted_at: getMountainTimeForDB(),
       };
       const { data, error } = await supabase
         .from('time_entries')

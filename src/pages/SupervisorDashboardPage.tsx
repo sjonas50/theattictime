@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { toast } from 'sonner';
 import { Tables, TablesUpdate, Enums } from '@/integrations/supabase/types';
 import { ShieldCheck, XCircle } from 'lucide-react'; // Icons for approve/reject
+import { getMountainTimeForDB, formatInMountainTime } from '@/lib/timezone';
 
 type TimeEntry = Tables<'time_entries'>;
 type UserRole = Enums<'app_role'>;
@@ -115,7 +116,7 @@ const SupervisorDashboardPage = () => {
       if (!employeeId && !isAdmin) throw new Error("Supervisor employee ID not found.");
       const updates: TablesUpdate<'time_entries'> = {
         is_finalized: true, // Should already be true if submitted
-        approved_at: new Date().toISOString(),
+        approved_at: getMountainTimeForDB(),
         approved_by_supervisor_id: employeeId ?? null,
         rejected_at: null, // Clear any previous rejection
         rejection_reason: null,
@@ -144,7 +145,7 @@ const SupervisorDashboardPage = () => {
     mutationFn: async ({ entryId, reason }) => {
       if (!reason || reason.trim() === '') throw new Error("Rejection reason is required.");
       const updates: TablesUpdate<'time_entries'> = {
-        rejected_at: new Date().toISOString(),
+        rejected_at: getMountainTimeForDB(),
         rejection_reason: reason,
         approved_at: null, // Clear any previous approval
         approved_by_supervisor_id: null,
@@ -222,7 +223,7 @@ const SupervisorDashboardPage = () => {
                     <p className="text-sm">Date: {format(new Date(entry.entry_date), "PPP")}</p>
                     <p className="text-sm">Hours: {entry.hours_worked}</p>
                     {entry.notes && <p className="text-sm text-muted-foreground">Notes: {entry.notes}</p>}
-                     {entry.submitted_at && <p className="text-xs text-muted-foreground">Submitted: {format(new Date(entry.submitted_at), "PPP p")}</p>}
+                     {entry.submitted_at && <p className="text-xs text-muted-foreground">Submitted: {formatInMountainTime(entry.submitted_at, "PPP p")}</p>}
                   </div>
                   <div className="flex space-x-2 self-start sm:self-center">
                     <Button
@@ -266,7 +267,7 @@ const SupervisorDashboardPage = () => {
                 <li key={entry.id} className="p-3 border rounded-md bg-green-500/10 border-green-500/20 dark:bg-green-500/20 dark:border-green-500/30">
                   {/* @ts-expect-error employees is not directly on TimeEntry type but fetched via join */}
                   <p className="font-medium">Employee: {entry.employees?.name || 'N/A'} (Project: {entry.project_code}) - {entry.hours_worked} hrs on {format(new Date(entry.entry_date), "PPP")}</p>
-                  {entry.approved_at && <p className="text-xs text-muted-foreground">Approved: {format(new Date(entry.approved_at), "PPP p")}</p>}
+                  {entry.approved_at && <p className="text-xs text-muted-foreground">Approved: {formatInMountainTime(entry.approved_at, "PPP p")}</p>}
                 </li>
               ))}
             </ul>
@@ -288,7 +289,7 @@ const SupervisorDashboardPage = () => {
                 <li key={entry.id} className="p-3 border rounded-md bg-red-500/10 border-red-500/20 dark:bg-red-500/20 dark:border-red-500/30">
                   {/* @ts-expect-error employees is not directly on TimeEntry type but fetched via join */}
                   <p className="font-medium">Employee: {entry.employees?.name || 'N/A'} (Project: {entry.project_code}) - {entry.hours_worked} hrs on {format(new Date(entry.entry_date), "PPP")}</p>
-                  {entry.rejected_at && <p className="text-xs text-muted-foreground">Rejected: {format(new Date(entry.rejected_at), "PPP p")}</p>}
+                  {entry.rejected_at && <p className="text-xs text-muted-foreground">Rejected: {formatInMountainTime(entry.rejected_at, "PPP p")}</p>}
                   {entry.rejection_reason && <p className="text-xs text-red-600 dark:text-red-400">Reason: {entry.rejection_reason}</p>}
                 </li>
               ))}
