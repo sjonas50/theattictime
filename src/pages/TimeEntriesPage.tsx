@@ -561,21 +561,21 @@ const TimeEntriesPage = () => {
           {!isLoadingEntries && timeEntries && timeEntries.length > 0 && (
             <ul className="space-y-4">
               {timeEntries.map((entry) => (
-                <li key={entry.id} className={`p-4 border rounded-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${entry.is_finalized ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold">Project: {entry.project_code}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${entry.is_finalized ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                        {entry.is_finalized ? 'Submitted' : 'Draft'}
-                      </span>
-                    </div>
-                    <p className="text-sm">Date: {format(new Date(entry.entry_date), "PPP")}</p>
-                    <p className="text-sm">Hours: {entry.hours_worked}</p>
-                    {entry.notes && <p className="text-sm text-muted-foreground">Notes: {entry.notes}</p>}
-                    {entry.is_finalized && entry.submitted_at && (
-                      <p className="text-xs text-gray-500">Submitted on: {format(new Date(entry.submitted_at), "PPP p")}</p>
-                    )}
-                  </div>
+                <li key={entry.id} className={`p-4 border rounded-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${entry.is_finalized ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800' : 'bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800'}`}>
+                   <div>
+                     <div className="flex items-center gap-2">
+                       <p className="font-semibold text-foreground">Project: {entry.project_code}</p>
+                       <span className={`text-xs px-2 py-0.5 rounded-full ${entry.is_finalized ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300'}`}>
+                         {entry.is_finalized ? 'Submitted' : 'Draft'}
+                       </span>
+                     </div>
+                     <p className="text-sm text-foreground">Date: {format(new Date(entry.entry_date), "PPP")}</p>
+                     <p className="text-sm text-foreground">Hours: {entry.hours_worked}</p>
+                     {entry.notes && <p className="text-sm text-muted-foreground">Notes: {entry.notes}</p>}
+                     {entry.is_finalized && entry.submitted_at && (
+                       <p className="text-xs text-muted-foreground">Submitted on: {format(new Date(entry.submitted_at), "PPP p")}</p>
+                     )}
+                   </div>
                   <div className="flex flex-wrap gap-2 self-start sm:self-center">
                     {!entry.is_finalized && (
                       <>
@@ -607,10 +607,10 @@ const TimeEntriesPage = () => {
                         </Button>
                       </>
                     )}
-                    {/* Placeholder for "Request Edit" for submitted entries */}
-                    {entry.is_finalized && (
-                       <p className="text-xs text-gray-500 italic mt-1">Entry submitted. Contact supervisor for changes.</p>
-                    )}
+                     {/* Placeholder for "Request Edit" for submitted entries */}
+                     {entry.is_finalized && (
+                        <p className="text-xs text-muted-foreground italic mt-1">Entry submitted. Contact supervisor for changes.</p>
+                     )}
                   </div>
                 </li>
               ))}
