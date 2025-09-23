@@ -153,7 +153,9 @@ const TimeEntriesPage = () => {
   // Mutation to add a new time entry
   const addTimeEntryMutation = useMutation<TimeEntry, Error, AddTimeEntryVariables>({
     mutationFn: async (newEntryData) => {
-      if (!employeeId) throw new Error("Employee ID not found.");
+      if (!employeeId) {
+        throw new Error("Employee ID not found. Please ensure you are registered as an employee.");
+      }
       
       const entryToInsert: TablesInsert<'time_entries'> = {
         project_code: newEntryData.project_code,
@@ -171,7 +173,10 @@ const TimeEntriesPage = () => {
         .select('*') // Explicitly select all columns to ensure correct return type
         .single();
 
-      if (error) throw new Error(error.message);
+      if (error) {
+        console.error('Time entry insertion error:', error);
+        throw new Error(`Failed to create time entry: ${error.message}`);
+      }
       if (!data) throw new Error("Failed to create time entry: no data returned."); // Ensure data is not null
 
       return data; // data is now correctly typed as TimeEntry (Tables<'time_entries', 'Row'>)
@@ -190,7 +195,9 @@ const TimeEntriesPage = () => {
   // Mutation to update an existing time entry and log modification
   const updateTimeEntryMutation = useMutation<TimeEntry, Error, UpdateTimeEntryVariables>({
     mutationFn: async ({ id, original_entry, modification_reason, ...updatedValues }) => {
-      if (!employeeId) throw new Error("Employee ID not found.");
+      if (!employeeId) {
+        throw new Error("Employee ID not found. Please ensure you are registered as an employee.");
+      }
 
       const entryUpdate: TablesUpdate<'time_entries'> = {
         project_code: updatedValues.project_code,
@@ -534,7 +541,7 @@ const TimeEntriesPage = () => {
                 />
               )}
               <div className="flex space-x-2">
-                <Button type="submit" disabled={addTimeEntryMutation.isPending || updateTimeEntryMutation.isPending || isLoadingProjectCodes}>
+                <Button type="submit" disabled={!employeeId || addTimeEntryMutation.isPending || updateTimeEntryMutation.isPending || isLoadingProjectCodes}>
                   {editingEntry 
                     ? <><CheckCircle2 className="mr-2 h-4 w-4" /> {updateTimeEntryMutation.isPending ? 'Updating...' : 'Update Entry'}</>
                     : <><Plus className="mr-2 h-4 w-4" /> {addTimeEntryMutation.isPending ? 'Adding...' : 'Add Entry as Draft'}</>
