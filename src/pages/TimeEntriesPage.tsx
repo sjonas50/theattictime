@@ -102,13 +102,19 @@ const TimeEntriesPage = () => {
     },
   });
 
+  // Helper to parse date string as local date
+  const parseDateAsLocal = (dateString: string): Date => {
+    const [year, month, day] = dateString.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
   const form = useForm<TimeEntryFormValues>({
     resolver: zodResolver(timeEntrySchema),
     defaultValues: {
       project_code: '',
       hours_worked: 0,
       notes: '',
-      entry_date: new Date(getCurrentMountainDate()),
+      entry_date: parseDateAsLocal(getCurrentMountainDate()),
       modification_reason: '',
     },
   });
@@ -118,7 +124,7 @@ const TimeEntriesPage = () => {
       form.reset({
         project_code: editingEntry.project_code,
         hours_worked: editingEntry.hours_worked,
-        entry_date: new Date(editingEntry.entry_date),
+        entry_date: parseDateAsLocal(editingEntry.entry_date),
         notes: editingEntry.notes || '',
         modification_reason: '', // Clear reason on new edit
       });
@@ -127,7 +133,7 @@ const TimeEntriesPage = () => {
         project_code: '',
         hours_worked: 0,
         notes: '',
-        entry_date: new Date(getCurrentMountainDate()),
+        entry_date: parseDateAsLocal(getCurrentMountainDate()),
         modification_reason: '',
       });
     }
