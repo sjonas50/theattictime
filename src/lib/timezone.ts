@@ -25,8 +25,10 @@ export const getCurrentMountainTime = (): Date => {
  * Convert a Mountain Time date string (YYYY-MM-DD) to UTC for database storage
  */
 export const mountainDateToUtc = (dateString: string): string => {
-  // Create date at midnight Mountain Time
-  const mountainDate = new Date(`${dateString}T00:00:00`);
+  // Parse the date string and create a Date object representing midnight Mountain Time
+  // fromZonedTime expects a Date object that represents the "wall clock" time in the specified timezone
+  const [year, month, day] = dateString.split('-').map(Number);
+  const mountainDate = new Date(year, month - 1, day, 0, 0, 0, 0);
   const utcDate = fromZonedTime(mountainDate, MOUNTAIN_TIMEZONE);
   return utcDate.toISOString();
 };
