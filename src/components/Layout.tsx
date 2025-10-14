@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { supabase } from '@/integrations/supabase/client';
 import { Enums } from '@/integrations/supabase/types';
-import { LogOut, List, ShieldAlert, UserCog, Download, BarChart3 } from 'lucide-react';
+import { LogOut, List, ShieldAlert, UserCog, Download, BarChart3, Settings } from 'lucide-react';
 
 type UserRole = Enums<'app_role'>;
 
@@ -75,6 +75,9 @@ const Layout = ({ children }: { children?: ReactNode }) => {
                 )}
                 <Button onClick={() => navigate('/reports')} variant="ghost" className="text-white hover:bg-gray-700 px-2 md:px-3">
                   <BarChart3 className="mr-1 md:mr-2 h-4 w-4" /> Reports
+                </Button>
+                <Button onClick={() => navigate('/settings')} variant="ghost" className="text-white hover:bg-gray-700 px-2 md:px-3">
+                  <Settings className="mr-1 md:mr-2 h-4 w-4" /> Settings
                 </Button>
                 <ThemeToggle />
                 <Button onClick={signOut} variant="ghost" className="text-white hover:bg-gray-700 px-2 md:px-3">
