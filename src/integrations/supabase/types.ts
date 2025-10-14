@@ -82,6 +82,44 @@ export type Database = {
         }
         Relationships: []
       }
+      slack_daily_standup_messages: {
+        Row: {
+          created_at: string | null
+          employee_id: string
+          entry_date: string
+          id: string
+          slack_channel_id: string
+          slack_message_ts: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          employee_id: string
+          entry_date: string
+          id?: string
+          slack_channel_id?: string
+          slack_message_ts: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          employee_id?: string
+          entry_date?: string
+          id?: string
+          slack_channel_id?: string
+          slack_message_ts?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slack_daily_standup_messages_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       time_entries: {
         Row: {
           approved_at: string | null
@@ -98,6 +136,7 @@ export type Database = {
           project_code: string
           rejected_at: string | null
           rejection_reason: string | null
+          slack_message_ts: string | null
           submitted_at: string | null
           sync_status: string | null
           updated_at: string
@@ -117,6 +156,7 @@ export type Database = {
           project_code: string
           rejected_at?: string | null
           rejection_reason?: string | null
+          slack_message_ts?: string | null
           submitted_at?: string | null
           sync_status?: string | null
           updated_at?: string
@@ -136,6 +176,7 @@ export type Database = {
           project_code?: string
           rejected_at?: string | null
           rejection_reason?: string | null
+          slack_message_ts?: string | null
           submitted_at?: string | null
           sync_status?: string | null
           updated_at?: string
