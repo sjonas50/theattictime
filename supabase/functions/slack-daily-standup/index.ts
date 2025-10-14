@@ -86,8 +86,8 @@ Deno.serve(async (req) => {
         messageText
       );
     } else {
-      // Post new message
-      const messageTs = await postSlackMessage('C08680D2ND2', messageText);
+    // Post new message
+      const messageTs = await postSlackMessage('C06HAQ1SPDF', messageText);
       
       // Store the message timestamp
       if (messageTs) {
@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
             employee_id,
             entry_date,
             slack_message_ts: messageTs,
-            slack_channel_id: 'C08680D2ND2',
+            slack_channel_id: 'C06HAQ1SPDF',
           });
       }
     }
