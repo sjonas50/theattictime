@@ -197,8 +197,10 @@ const SupervisorDashboardPage = () => {
   }
   
   const entriesToReview = timeEntries?.filter(entry => entry.is_finalized && !entry.approved_at && !entry.rejected_at);
-  const approvedEntries = timeEntries?.filter(entry => entry.approved_at);
-  const rejectedEntries = timeEntries?.filter(entry => entry.rejected_at);
+  const approvedEntries = timeEntries?.filter(entry => entry.approved_at)
+    .sort((a, b) => new Date(b.approved_at!).getTime() - new Date(a.approved_at!).getTime());
+  const rejectedEntries = timeEntries?.filter(entry => entry.rejected_at)
+    .sort((a, b) => new Date(b.rejected_at!).getTime() - new Date(a.rejected_at!).getTime());
 
   return (
     <div className="space-y-6">
