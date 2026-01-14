@@ -74,9 +74,9 @@ const SupervisorDashboardPage = () => {
       if (isAdmin) {
         const { data, error } = await supabase
           .from('time_entries')
-        .select(`
+          .select(`
             *,
-            employees:employees!time_entries_employee_id_fkey!inner (
+            employees!inner (
               name,
               supervisor_id
             )
@@ -96,10 +96,10 @@ const SupervisorDashboardPage = () => {
         .from('time_entries')
         .select(`
           *,
-          employees:employees!time_entries_employee_id_fkey!inner ( 
+          employees!inner (
             name,
             supervisor_id
-          ) 
+          )
         `)
         .eq('employees.supervisor_id', employeeId)
         .order('submitted_at', { ascending: true, nullsFirst: false })
