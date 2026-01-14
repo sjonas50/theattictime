@@ -66,11 +66,18 @@ const SupervisorDashboardPage = () => {
     }
   }, [user]);
 
-  // Fetch time entries for review (admin sees all; supervisor sees their team)
-  const { data: timeEntries, isLoading: isLoadingEntries } = useQuery<TimeEntry[], Error>({
-    queryKey: ['reviewTimeEntries', isAdmin, employeeId],
+  // Fetch time entries for review (pending only)
+  const canReview = isAdmin || (isSupervisor && !!employeeId);
+
+  const {
+    data: pendingEntries,
+    isLoading: isLoadingPending,
+    error: pendingError,
+  } = useQuery<TimeEntry[], Error>({
+    queryKey: ['reviewTimeEntries', 'pending', isAdmin, employeeId],
+    enabled: canReview,
     queryFn: async () => {
-      // Admin: see all entries
+      // Admin: see all pending entries
       if (isAdmin) {
         const { data, error } = await supabase
           .from('time_entries')
@@ -81,16 +88,18 @@ const SupervisorDashboardPage = () => {
               supervisor_id
             )
           `)
-          .order('submitted_at', { ascending: true, nullsFirst: false })
+          .eq('is_finalized', true)
+          .is('approved_at', null)
+          .is('rejected_at', null)
+          .order('submitted_at', { ascending: false, nullsFirst: false })
           .order('entry_date', { ascending: false });
+
         if (error) throw new Error(error.message);
         return data || [];
       }
 
-      // Supervisor: only team entries
-      if (!employeeId) {
-        throw new Error("Supervisor employee ID not found");
-      }
+      // Supervisor: only team pending entries
+      if (!employeeId) throw new Error('Supervisor employee ID not found');
 
       const { data, error } = await supabase
         .from('time_entries')
@@ -101,13 +110,106 @@ const SupervisorDashboardPage = () => {
             supervisor_id
           )
         `)
+        .eq('is_finalized', true)
+        .is('approved_at', null)
+        .is('rejected_at', null)
         .eq('employees.supervisor_id', employeeId)
-        .order('submitted_at', { ascending: true, nullsFirst: false })
+        .order('submitted_at', { ascending: false, nullsFirst: false })
         .order('entry_date', { ascending: false });
+
       if (error) throw new Error(error.message);
       return data || [];
     },
-    enabled: isAdmin || (isSupervisor && !!employeeId),
+  });
+
+  const {
+    data: approvedEntries,
+    isLoading: isLoadingApproved,
+  } = useQuery<TimeEntry[], Error>({
+    queryKey: ['reviewTimeEntries', 'approvedRecent', isAdmin, employeeId],
+    enabled: canReview,
+    queryFn: async () => {
+      if (isAdmin) {
+        const { data, error } = await supabase
+          .from('time_entries')
+          .select(`
+            *,
+            employees:employees!time_entries_employee_id_fkey!inner (
+              name,
+              supervisor_id
+            )
+          `)
+          .not('approved_at', 'is', null)
+          .order('approved_at', { ascending: false })
+          .limit(5);
+        if (error) throw new Error(error.message);
+        return data || [];
+      }
+
+      if (!employeeId) throw new Error('Supervisor employee ID not found');
+
+      const { data, error } = await supabase
+        .from('time_entries')
+        .select(`
+          *,
+          employees:employees!time_entries_employee_id_fkey!inner (
+            name,
+            supervisor_id
+          )
+        `)
+        .not('approved_at', 'is', null)
+        .eq('employees.supervisor_id', employeeId)
+        .order('approved_at', { ascending: false })
+        .limit(5);
+
+      if (error) throw new Error(error.message);
+      return data || [];
+    },
+  });
+
+  const {
+    data: rejectedEntries,
+    isLoading: isLoadingRejected,
+  } = useQuery<TimeEntry[], Error>({
+    queryKey: ['reviewTimeEntries', 'rejectedRecent', isAdmin, employeeId],
+    enabled: canReview,
+    queryFn: async () => {
+      if (isAdmin) {
+        const { data, error } = await supabase
+          .from('time_entries')
+          .select(`
+            *,
+            employees:employees!time_entries_employee_id_fkey!inner (
+              name,
+              supervisor_id
+            )
+          `)
+          .not('rejected_at', 'is', null)
+          .order('rejected_at', { ascending: false })
+          .limit(5);
+        if (error) throw new Error(error.message);
+        return data || [];
+      }
+
+      if (!employeeId) throw new Error('Supervisor employee ID not found');
+
+      const { data, error } = await supabase
+        .from('time_entries')
+        .select(`
+          *,
+          employees:employees!time_entries_employee_id_fkey!inner (
+            name,
+            supervisor_id
+          )
+        `)
+        .not('rejected_at', 'is', null)
+        .eq('employees.supervisor_id', employeeId)
+        .order('rejected_at', { ascending: false })
+        .limit(5);
+
+      if (error) throw new Error(error.message);
+      return data || [];
+    },
   });
 
   // Mutation to approve a time entry
@@ -196,11 +298,8 @@ const SupervisorDashboardPage = () => {
     return <p>Access Denied. This page is for supervisors or admins only.</p>;
   }
   
-  const entriesToReview = timeEntries?.filter(entry => entry.is_finalized && !entry.approved_at && !entry.rejected_at);
-  const approvedEntries = timeEntries?.filter(entry => entry.approved_at)
-    .sort((a, b) => new Date(b.approved_at!).getTime() - new Date(a.approved_at!).getTime());
-  const rejectedEntries = timeEntries?.filter(entry => entry.rejected_at)
-    .sort((a, b) => new Date(b.rejected_at!).getTime() - new Date(a.rejected_at!).getTime());
+  const entriesToReview = pendingEntries;
+  const isLoadingEntries = isLoadingPending || isLoadingApproved || isLoadingRejected;
 
   return (
     <div className="space-y-6">
@@ -211,11 +310,16 @@ const SupervisorDashboardPage = () => {
           <CardDescription>Approve or reject submitted time entries.</CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoadingEntries && <p>Loading entries...</p>}
-          {!isLoadingEntries && (!entriesToReview || entriesToReview.length === 0) && (
+          {pendingError && (
+            <p className="text-sm text-destructive">
+              Failed to load review entries: {pendingError.message}
+            </p>
+          )}
+          {isLoadingPending && <p>Loading entries...</p>}
+          {!isLoadingPending && (!entriesToReview || entriesToReview.length === 0) && (
             <p>No time entries currently awaiting review.</p>
           )}
-          {!isLoadingEntries && entriesToReview && entriesToReview.length > 0 && (
+          {!isLoadingPending && entriesToReview && entriesToReview.length > 0 && (
             <ul className="space-y-4">
               {entriesToReview.map((entry) => (
                 <li key={entry.id} className="p-4 border rounded-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-secondary/50 border-secondary">
@@ -225,7 +329,9 @@ const SupervisorDashboardPage = () => {
                     <p className="text-sm">Date: {format(new Date(entry.entry_date), "PPP")}</p>
                     <p className="text-sm">Hours: {entry.hours_worked}</p>
                     {entry.notes && <p className="text-sm text-muted-foreground">Notes: {entry.notes}</p>}
-                     {entry.submitted_at && <p className="text-xs text-muted-foreground">Submitted: {formatInMountainTime(entry.submitted_at, "PPP p")}</p>}
+                    {entry.submitted_at && (
+                      <p className="text-xs text-muted-foreground">Submitted: {formatInMountainTime(entry.submitted_at, "PPP p")}</p>
+                    )}
                   </div>
                   <div className="flex space-x-2 self-start sm:self-center">
                     <Button
@@ -245,7 +351,7 @@ const SupervisorDashboardPage = () => {
                       disabled={rejectTimeEntryMutation.isPending && rejectTimeEntryMutation.variables?.entryId === entry.id}
                     >
                       <XCircle className="mr-1 h-4 w-4" />
-                       {rejectTimeEntryMutation.isPending && rejectTimeEntryMutation.variables?.entryId === entry.id ? 'Rejecting...' : 'Reject'}
+                      {rejectTimeEntryMutation.isPending && rejectTimeEntryMutation.variables?.entryId === entry.id ? 'Rejecting...' : 'Reject'}
                     </Button>
                   </div>
                 </li>
@@ -261,9 +367,9 @@ const SupervisorDashboardPage = () => {
           <CardTitle>Recently Approved Entries</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoadingEntries && <p>Loading...</p>}
-          {!isLoadingEntries && (!approvedEntries || approvedEntries.length === 0) && <p>No entries approved yet.</p>}
-          {!isLoadingEntries && approvedEntries && approvedEntries.length > 0 && (
+          {isLoadingApproved && <p>Loading...</p>}
+          {!isLoadingApproved && (!approvedEntries || approvedEntries.length === 0) && <p>No entries approved yet.</p>}
+          {!isLoadingApproved && approvedEntries && approvedEntries.length > 0 && (
             <ul className="space-y-2">
               {approvedEntries.slice(0, 5).map(entry => ( // Show last 5
                 <li key={entry.id} className="p-3 border rounded-md bg-green-500/10 border-green-500/20 dark:bg-green-500/20 dark:border-green-500/30">
@@ -283,9 +389,9 @@ const SupervisorDashboardPage = () => {
           <CardTitle>Recently Rejected Entries</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoadingEntries && <p>Loading...</p>}
-          {!isLoadingEntries && (!rejectedEntries || rejectedEntries.length === 0) && <p>No entries rejected yet.</p>}
-          {!isLoadingEntries && rejectedEntries && rejectedEntries.length > 0 && (
+          {isLoadingRejected && <p>Loading...</p>}
+          {!isLoadingRejected && (!rejectedEntries || rejectedEntries.length === 0) && <p>No entries rejected yet.</p>}
+          {!isLoadingRejected && rejectedEntries && rejectedEntries.length > 0 && (
             <ul className="space-y-2">
               {rejectedEntries.slice(0, 5).map(entry => ( // Show last 5
                 <li key={entry.id} className="p-3 border rounded-md bg-red-500/10 border-red-500/20 dark:bg-red-500/20 dark:border-red-500/30">
