@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Tables, TablesUpdate, Enums } from '@/integrations/supabase/types';
-import { ShieldCheck, XCircle } from 'lucide-react'; // Icons for approve/reject
+import { ShieldCheck, XCircle, RefreshCw } from 'lucide-react';
 import { getMountainTimeForDB, formatInMountainTime } from '@/lib/timezone';
 
 type TimeEntry = Tables<'time_entries'>;
@@ -16,57 +16,40 @@ type UserRole = Enums<'app_role'>;
 const SupervisorDashboardPage = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [userRoles, setUserRoles] = useState<UserRole[]>([]);
-  const [isSupervisor, setIsSupervisor] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [employeeId, setEmployeeId] = useState<string | null>(null);
 
-  // Fetch current user's employee ID (supervisors are also employees)
-  useEffect(() => {
-    if (user) {
-      const fetchEmployeeDetails = async () => {
-        const { data, error } = await supabase
-          .from('employees')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
-        if (error) {
-          console.error('Error fetching supervisor employee_id:', error);
-          // toast.error('Error fetching your employee details.'); // Avoid toast if not critical for page load
-        } else if (data) {
-          setEmployeeId(data.id);
-        }
+  // Consolidated fetch: roles + employee ID in a single query to avoid race conditions
+  const { data: userContext, isLoading: isLoadingContext } = useQuery({
+    queryKey: ['supervisor_context', user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+
+      const [rolesResult, employeeResult] = await Promise.all([
+        supabase.from('user_roles').select('role').eq('user_id', user.id),
+        supabase.from('employees').select('id').eq('user_id', user.id).single(),
+      ]);
+
+      if (rolesResult.error) {
+        console.error('Error fetching user roles:', rolesResult.error);
+        throw new Error('Failed to fetch user roles.');
+      }
+
+      const roles = (rolesResult.data || []).map(r => r.role as UserRole);
+      return {
+        roles,
+        isAdmin: roles.includes('admin'),
+        isSupervisor: roles.includes('supervisor'),
+        employeeId: employeeResult.data?.id || null,
       };
-      fetchEmployeeDetails();
-    }
-  }, [user]);
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  // Fetch user roles
-  useEffect(() => {
-    if (user) {
-      const fetchUserRoles = async () => {
-        const { data, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id);
+  const isAdmin = userContext?.isAdmin ?? false;
+  const isSupervisor = userContext?.isSupervisor ?? false;
+  const employeeId = userContext?.employeeId ?? null;
+  const userRoles = userContext?.roles ?? [];
 
-        if (error) {
-          console.error('Error fetching user roles:', error);
-          toast.error('Failed to fetch user roles.');
-          return;
-        }
-        if (data) {
-          const roles = data.map(r => r.role as UserRole);
-          setUserRoles(roles);
-          setIsSupervisor(roles.includes('supervisor'));
-          setIsAdmin(roles.includes('admin'));
-        }
-      };
-      fetchUserRoles();
-    }
-  }, [user]);
-
-  // Fetch time entries for review (pending only)
   const canReview = isAdmin || (isSupervisor && !!employeeId);
 
   const {
@@ -290,8 +273,8 @@ const SupervisorDashboardPage = () => {
     return <p>Please sign in.</p>;
   }
 
-  if (userRoles.length === 0 && !isAdmin && !isSupervisor) { // Still loading roles
-     return <p>Loading user data or unauthorized...</p>;
+  if (isLoadingContext) {
+    return <p>Loading user data...</p>;
   }
 
   if (!isAdmin && !isSupervisor) {
@@ -301,9 +284,20 @@ const SupervisorDashboardPage = () => {
   const entriesToReview = pendingEntries;
   const isLoadingEntries = isLoadingPending || isLoadingApproved || isLoadingRejected;
 
+  const handleRefreshAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['reviewTimeEntries'] });
+    toast.info('Refreshing entries...');
+  };
+
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Supervisor Dashboard</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Supervisor Dashboard</h1>
+        <Button variant="outline" size="sm" onClick={handleRefreshAll}>
+          <RefreshCw className="mr-1 h-4 w-4" />
+          Refresh
+        </Button>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>Time Entries for Review</CardTitle>
