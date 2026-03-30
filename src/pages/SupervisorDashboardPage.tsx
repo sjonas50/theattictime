@@ -273,8 +273,8 @@ const SupervisorDashboardPage = () => {
     return <p>Please sign in.</p>;
   }
 
-  if (userRoles.length === 0 && !isAdmin && !isSupervisor) { // Still loading roles
-     return <p>Loading user data or unauthorized...</p>;
+  if (isLoadingContext) {
+    return <p>Loading user data...</p>;
   }
 
   if (!isAdmin && !isSupervisor) {
@@ -284,9 +284,20 @@ const SupervisorDashboardPage = () => {
   const entriesToReview = pendingEntries;
   const isLoadingEntries = isLoadingPending || isLoadingApproved || isLoadingRejected;
 
+  const handleRefreshAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['reviewTimeEntries'] });
+    toast.info('Refreshing entries...');
+  };
+
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Supervisor Dashboard</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Supervisor Dashboard</h1>
+        <Button variant="outline" size="sm" onClick={handleRefreshAll}>
+          <RefreshCw className="mr-1 h-4 w-4" />
+          Refresh
+        </Button>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>Time Entries for Review</CardTitle>
