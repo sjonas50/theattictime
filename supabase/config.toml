@@ -15,3 +15,6 @@ project_id = "mpbwlrpzltkhagzgkbxn" # Do not change this line
 
 [functions.restricted-signup]
   verify_jwt = false # Public function for signup
+
+[functions.populate-timesheet]
+  verify_jwt = true
