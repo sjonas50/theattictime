@@ -7,7 +7,18 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Tables, TablesUpdate, Enums } from '@/integrations/supabase/types';
-import { ShieldCheck, XCircle, RefreshCw } from 'lucide-react';
+import { ShieldCheck, XCircle, RefreshCw, CheckCheck } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { getMountainTimeForDB, formatInMountainTime } from '@/lib/timezone';
 
 type TimeEntry = Tables<'time_entries'>;
