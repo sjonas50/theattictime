@@ -7,7 +7,18 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Tables, TablesUpdate, Enums } from '@/integrations/supabase/types';
-import { ShieldCheck, XCircle, RefreshCw } from 'lucide-react';
+import { ShieldCheck, XCircle, RefreshCw, CheckCheck } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { getMountainTimeForDB, formatInMountainTime } from '@/lib/timezone';
 
 type TimeEntry = Tables<'time_entries'>;
@@ -259,7 +270,7 @@ const SupervisorDashboardPage = () => {
 
   const handleReject = (entryId: string) => {
     const reason = prompt("Please provide a reason for rejection:");
-    if (reason !== null) { // prompt returns null if cancelled
+    if (reason !== null) {
       if (reason.trim() === "") {
         toast.error("Rejection reason cannot be empty.");
         return;
@@ -268,6 +279,31 @@ const SupervisorDashboardPage = () => {
     }
   };
 
+  // Mutation to approve all pending entries at once
+  const approveAllMutation = useMutation<void, Error>({
+    mutationFn: async () => {
+      if (!pendingEntries || pendingEntries.length === 0) throw new Error("No entries to approve.");
+      const ids = pendingEntries.map(e => e.id);
+      const { error } = await supabase
+        .from('time_entries')
+        .update({
+          is_finalized: true,
+          approved_at: getMountainTimeForDB(),
+          approved_by_supervisor_id: employeeId ?? null,
+          rejected_at: null,
+          rejection_reason: null,
+        })
+        .in('id', ids);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reviewTimeEntries'] });
+      toast.success(`All ${pendingEntries?.length ?? 0} entries approved!`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to approve all: ${error.message}`);
+    },
+  });
 
   if (!user) {
     return <p>Please sign in.</p>;
@@ -299,9 +335,38 @@ const SupervisorDashboardPage = () => {
         </Button>
       </div>
       <Card>
-        <CardHeader>
-          <CardTitle>Time Entries for Review</CardTitle>
-          <CardDescription>Approve or reject submitted time entries.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Time Entries for Review</CardTitle>
+            <CardDescription>Approve or reject submitted time entries.</CardDescription>
+          </div>
+          {isAdmin && entriesToReview && entriesToReview.length > 1 && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="bg-green-600 hover:bg-green-700 text-white border-green-600">
+                  <CheckCheck className="mr-1 h-4 w-4" />
+                  Approve All ({entriesToReview.length})
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Approve all {entriesToReview.length} entries?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will approve all currently pending time entries. This action cannot be easily undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => approveAllMutation.mutate()}
+                    disabled={approveAllMutation.isPending}
+                  >
+                    {approveAllMutation.isPending ? 'Approving...' : 'Yes, Approve All'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </CardHeader>
         <CardContent>
           {pendingError && (
