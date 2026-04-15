@@ -270,7 +270,7 @@ const SupervisorDashboardPage = () => {
 
   const handleReject = (entryId: string) => {
     const reason = prompt("Please provide a reason for rejection:");
-    if (reason !== null) { // prompt returns null if cancelled
+    if (reason !== null) {
       if (reason.trim() === "") {
         toast.error("Rejection reason cannot be empty.");
         return;
@@ -279,6 +279,31 @@ const SupervisorDashboardPage = () => {
     }
   };
 
+  // Mutation to approve all pending entries at once
+  const approveAllMutation = useMutation<void, Error>({
+    mutationFn: async () => {
+      if (!pendingEntries || pendingEntries.length === 0) throw new Error("No entries to approve.");
+      const ids = pendingEntries.map(e => e.id);
+      const { error } = await supabase
+        .from('time_entries')
+        .update({
+          is_finalized: true,
+          approved_at: getMountainTimeForDB(),
+          approved_by_supervisor_id: employeeId ?? null,
+          rejected_at: null,
+          rejection_reason: null,
+        })
+        .in('id', ids);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reviewTimeEntries'] });
+      toast.success(`All ${pendingEntries?.length ?? 0} entries approved!`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to approve all: ${error.message}`);
+    },
+  });
 
   if (!user) {
     return <p>Please sign in.</p>;
