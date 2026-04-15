@@ -335,9 +335,38 @@ const SupervisorDashboardPage = () => {
         </Button>
       </div>
       <Card>
-        <CardHeader>
-          <CardTitle>Time Entries for Review</CardTitle>
-          <CardDescription>Approve or reject submitted time entries.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Time Entries for Review</CardTitle>
+            <CardDescription>Approve or reject submitted time entries.</CardDescription>
+          </div>
+          {isAdmin && entriesToReview && entriesToReview.length > 1 && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="bg-green-600 hover:bg-green-700 text-white border-green-600">
+                  <CheckCheck className="mr-1 h-4 w-4" />
+                  Approve All ({entriesToReview.length})
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Approve all {entriesToReview.length} entries?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will approve all currently pending time entries. This action cannot be easily undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => approveAllMutation.mutate()}
+                    disabled={approveAllMutation.isPending}
+                  >
+                    {approveAllMutation.isPending ? 'Approving...' : 'Yes, Approve All'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </CardHeader>
         <CardContent>
           {pendingError && (
