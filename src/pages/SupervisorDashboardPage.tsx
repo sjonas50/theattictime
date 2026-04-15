@@ -340,7 +340,7 @@ const SupervisorDashboardPage = () => {
             <CardTitle>Time Entries for Review</CardTitle>
             <CardDescription>Approve or reject submitted time entries.</CardDescription>
           </div>
-          {isAdmin && entriesToReview && entriesToReview.length > 1 && (
+          {(isAdmin || isSupervisor) && entriesToReview && entriesToReview.length > 1 && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline" size="sm" className="bg-green-600 hover:bg-green-700 text-white border-green-600">
