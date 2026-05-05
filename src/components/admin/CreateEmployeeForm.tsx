@@ -40,35 +40,23 @@ const CreateEmployeeForm = () => {
       });
 
       if (functionError) {
-        // Log the full error object for debugging, in case the structure is different than expected
-        console.error('Error invoking edge function (full object):', JSON.stringify(functionError, null, 2));
-        
-        let specificErrorMessage = functionError.message; // Default to the generic Supabase client message
+        console.error('Error invoking edge function:', functionError);
 
-        // Attempt to extract a more specific error from the function's response context
-        // The 'context' field in FunctionsHttpError often holds the parsed JSON response body
-        if (functionError.context && typeof functionError.context === 'object' && functionError.context.error) {
-          specificErrorMessage = functionError.context.error;
-        } else if (functionError.context && typeof functionError.context === 'string') {
-          // If context is a string, try to parse it as JSON
-          try {
-            const parsedContext = JSON.parse(functionError.context);
-            if (parsedContext && parsedContext.error) {
-              specificErrorMessage = parsedContext.error;
-            } else {
-              // If parsing or finding .error fails, but context is a string, it might be the error message itself
-              specificErrorMessage = functionError.context;
-            }
-          } catch (e) {
-            // If JSON parsing fails, and context is a string, use context as the message
-            // This handles cases where the function might return a plain text error for some reason
-             if (functionError.context && functionError.context.length > 0 && functionError.context.length < 200) { // Check length to avoid huge html pages
-                specificErrorMessage = functionError.context;
-            }
-            // else, stick with the original functionError.message
+        let specificErrorMessage = functionError.message;
+
+        // FunctionsHttpError.context is a Response object — read its body to get the real error
+        try {
+          const ctx = (functionError as any).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const body = await ctx.clone().json();
+            if (body?.error) specificErrorMessage = body.error;
+          } else if (ctx && typeof ctx === 'object' && ctx.error) {
+            specificErrorMessage = ctx.error;
           }
+        } catch (e) {
+          console.error('Failed to parse function error body:', e);
         }
-        
+
         toast.error(`Failed to create employee: ${specificErrorMessage}`);
         return;
       }
