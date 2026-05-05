@@ -97,12 +97,14 @@ serve(async (req: Request) => {
 
     if (employeeError) {
       console.error('Error creating employee record:', employeeError.message);
-      console.log(`Attempting to roll back auth user creation for ID: ${newUserId}`);
-      const { error: deleteUserError } = await supabaseAdmin.auth.admin.deleteUser(newUserId);
-      if (deleteUserError) {
-        console.error('Failed to roll back auth user:', deleteUserError.message);
-      } else {
-        console.log('Rolled back auth user creation successfully.');
+      if (userWasCreated) {
+        console.log(`Attempting to roll back auth user creation for ID: ${newUserId}`);
+        const { error: deleteUserError } = await supabaseAdmin.auth.admin.deleteUser(newUserId);
+        if (deleteUserError) {
+          console.error('Failed to roll back auth user:', deleteUserError.message);
+        } else {
+          console.log('Rolled back auth user creation successfully.');
+        }
       }
       return new Response(JSON.stringify({ error: `Failed to create employee record: ${employeeError.message}` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
