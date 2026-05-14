@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from 'sonner';
-import { Trash } from 'lucide-react';
+import { Trash, Mail } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 
 type Employee = Tables<'employees'>;
