@@ -64,6 +64,15 @@ serve(async (req: Request) => {
 
       console.log(`User exists but has no employee record — creating employee for existing user: ${existingUser.id}`);
       newUserId = existingUser.id;
+
+      // Existing auth user — send a password recovery email so they can set up their account.
+      // inviteUserByEmail would fail because the user already exists.
+      const { error: recoveryError } = await supabaseAdmin.auth.resetPasswordForEmail(email);
+      if (recoveryError) {
+        console.warn(`Failed to send setup email to existing user ${email}: ${recoveryError.message}`);
+      } else {
+        console.log(`Sent password setup email to existing user: ${email}`);
+      }
     } else {
       console.log(`Attempting to invite auth user for: ${email}`);
       const { data: authUserResponse, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email);
