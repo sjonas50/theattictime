@@ -232,23 +232,33 @@ const EmployeeManagementTable = () => {
                   );
                 })}
                 <TableCell>
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
-                    onClick={() => {
-                      // Prevent deleting self if user is an admin and the employee record is theirs
-                      if (user && employee.user_id === user.id && currentRoles.includes('admin')) {
-                         toast.error("Administrators cannot delete their own employee record.");
-                         return;
-                      }
-                      if (window.confirm(`Are you sure you want to delete employee ${employee.name}? This action cannot be undone.`)) {
-                        deleteEmployeeMutation.mutate(employee.id);
-                      }
-                    }}
-                    disabled={deleteEmployeeMutation.isPending || (user && employee.user_id === user.id && currentRoles.includes('admin'))}
-                  >
-                    <Trash className="h-4 w-4 mr-1" /> Delete
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => resendInviteMutation.mutate(employee.user_id)}
+                      disabled={resendInviteMutation.isPending}
+                      title="Resend invite / password setup email"
+                    >
+                      <Mail className="h-4 w-4 mr-1" /> Resend
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        if (user && employee.user_id === user.id && currentRoles.includes('admin')) {
+                          toast.error("Administrators cannot delete their own employee record.");
+                          return;
+                        }
+                        if (window.confirm(`Are you sure you want to delete employee ${employee.name}? This action cannot be undone.`)) {
+                          deleteEmployeeMutation.mutate(employee.id);
+                        }
+                      }}
+                      disabled={deleteEmployeeMutation.isPending || (user && employee.user_id === user.id && currentRoles.includes('admin'))}
+                    >
+                      <Trash className="h-4 w-4 mr-1" /> Delete
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             );
