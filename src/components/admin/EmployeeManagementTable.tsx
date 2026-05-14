@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from 'sonner';
-import { Trash } from 'lucide-react';
+import { Trash, Mail } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 
 type Employee = Tables<'employees'>;
@@ -109,6 +109,32 @@ const EmployeeManagementTable = () => {
     },
   });
 
+  const resendInviteMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const { data, error } = await supabase.functions.invoke('resend-employee-invite', {
+        body: { userId },
+      });
+      if (error) {
+        let msg = error.message;
+        try {
+          const ctx = (error as any).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const body = await ctx.clone().json();
+            if (body?.error) msg = body.error;
+          }
+        } catch (_) { /* ignore */ }
+        throw new Error(msg);
+      }
+      return data;
+    },
+    onSuccess: (data: any) => {
+      toast.success(data?.message ?? 'Invite re-sent.');
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to resend invite: ${error.message}`);
+    },
+  });
+
 
   if (isLoadingEmployees || isLoadingUserRoles) return <p>Loading employee data...</p>;
   if (employeesError) return <p className="text-red-500">Error loading employees: {employeesError.message}</p>;
@@ -206,23 +232,33 @@ const EmployeeManagementTable = () => {
                   );
                 })}
                 <TableCell>
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
-                    onClick={() => {
-                      // Prevent deleting self if user is an admin and the employee record is theirs
-                      if (user && employee.user_id === user.id && currentRoles.includes('admin')) {
-                         toast.error("Administrators cannot delete their own employee record.");
-                         return;
-                      }
-                      if (window.confirm(`Are you sure you want to delete employee ${employee.name}? This action cannot be undone.`)) {
-                        deleteEmployeeMutation.mutate(employee.id);
-                      }
-                    }}
-                    disabled={deleteEmployeeMutation.isPending || (user && employee.user_id === user.id && currentRoles.includes('admin'))}
-                  >
-                    <Trash className="h-4 w-4 mr-1" /> Delete
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => resendInviteMutation.mutate(employee.user_id)}
+                      disabled={resendInviteMutation.isPending}
+                      title="Resend invite / password setup email"
+                    >
+                      <Mail className="h-4 w-4 mr-1" /> Resend
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        if (user && employee.user_id === user.id && currentRoles.includes('admin')) {
+                          toast.error("Administrators cannot delete their own employee record.");
+                          return;
+                        }
+                        if (window.confirm(`Are you sure you want to delete employee ${employee.name}? This action cannot be undone.`)) {
+                          deleteEmployeeMutation.mutate(employee.id);
+                        }
+                      }}
+                      disabled={deleteEmployeeMutation.isPending || (user && employee.user_id === user.id && currentRoles.includes('admin'))}
+                    >
+                      <Trash className="h-4 w-4 mr-1" /> Delete
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             );
