@@ -65,11 +65,8 @@ serve(async (req: Request) => {
       console.log(`User exists but has no employee record — creating employee for existing user: ${existingUser.id}`);
       newUserId = existingUser.id;
     } else {
-      console.log(`Attempting to create auth user (invitation flow) for: ${email}`);
-      const { data: authUserResponse, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email: email,
-        email_confirm: true,
-      });
+      console.log(`Attempting to invite auth user for: ${email}`);
+      const { data: authUserResponse, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email);
 
       if (authError) {
         console.error('Error creating auth user:', authError.message);
