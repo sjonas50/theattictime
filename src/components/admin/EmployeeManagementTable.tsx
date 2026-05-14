@@ -109,6 +109,32 @@ const EmployeeManagementTable = () => {
     },
   });
 
+  const resendInviteMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const { data, error } = await supabase.functions.invoke('resend-employee-invite', {
+        body: { userId },
+      });
+      if (error) {
+        let msg = error.message;
+        try {
+          const ctx = (error as any).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const body = await ctx.clone().json();
+            if (body?.error) msg = body.error;
+          }
+        } catch (_) { /* ignore */ }
+        throw new Error(msg);
+      }
+      return data;
+    },
+    onSuccess: (data: any) => {
+      toast.success(data?.message ?? 'Invite re-sent.');
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to resend invite: ${error.message}`);
+    },
+  });
+
 
   if (isLoadingEmployees || isLoadingUserRoles) return <p>Loading employee data...</p>;
   if (employeesError) return <p className="text-red-500">Error loading employees: {employeesError.message}</p>;
