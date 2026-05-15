@@ -64,8 +64,8 @@ serve(async (req: Request) => {
 
     // Caller must be admin
     const authHeader = req.headers.get('Authorization') ?? '';
-    const token = authHeader.replace('Bearer ', '');
-    const { data: userRes, error: userErr } = await admin.auth.getUser(token);
+    const callerJwt = authHeader.replace('Bearer ', '');
+    const { data: userRes, error: userErr } = await admin.auth.getUser(callerJwt);
     if (userErr || !userRes.user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -94,8 +94,8 @@ serve(async (req: Request) => {
       });
     }
 
-    const token = createSetupToken();
-    const tokenHash = await hashSetupToken(token);
+    const setupToken = createSetupToken();
+    const tokenHash = await hashSetupToken(setupToken);
     const expiresAt = new Date(Date.now() + SETUP_TOKEN_TTL_MS).toISOString();
 
     const { error: updateError } = await admin.auth.admin.updateUserById(userId, {
@@ -108,7 +108,7 @@ serve(async (req: Request) => {
     });
     if (updateError) throw updateError;
 
-    const setupLink = `${appOrigin}/auth?setup_user=${encodeURIComponent(userId)}&setup_token=${encodeURIComponent(token)}`;
+    const setupLink = `${appOrigin}/auth?setup_user=${encodeURIComponent(userId)}&setup_token=${encodeURIComponent(setupToken)}`;
     await sendSetupEmail(targetUser.user.email, setupLink);
 
     return new Response(JSON.stringify({
