@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { Resend } from 'npm:resend@3.5.0';
 import { corsHeaders } from '../_shared/cors.ts';
 
 const SETUP_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -23,6 +24,25 @@ const hashSetupToken = async (token: string) => {
   return bytesToBase64Url(new Uint8Array(hash));
 };
 
+const sendSetupEmail = async (email: string, setupLink: string) => {
+  const resendApiKey = Deno.env.get('RESEND_API_KEY');
+  if (!resendApiKey) throw new Error('Email service is not configured.');
+
+  const resend = new Resend(resendApiKey);
+  const { error } = await resend.emails.send({
+    from: 'The Attic Time <steve@theattic.ai>',
+    to: [email],
+    subject: 'Set up your The Attic Time password',
+    html: `
+      <p>Use this secure link to set your The Attic Time password:</p>
+      <p><a href="${setupLink}">Create your password</a></p>
+      <p>This link expires in 7 days.</p>
+    `,
+  });
+
+  if (error) throw new Error(error.message ?? 'Failed to send setup email.');
+};
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -44,8 +64,8 @@ serve(async (req: Request) => {
 
     // Caller must be admin
     const authHeader = req.headers.get('Authorization') ?? '';
-    const token = authHeader.replace('Bearer ', '');
-    const { data: userRes, error: userErr } = await admin.auth.getUser(token);
+    const callerJwt = authHeader.replace('Bearer ', '');
+    const { data: userRes, error: userErr } = await admin.auth.getUser(callerJwt);
     if (userErr || !userRes.user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -74,8 +94,8 @@ serve(async (req: Request) => {
       });
     }
 
-    const token = createSetupToken();
-    const tokenHash = await hashSetupToken(token);
+    const setupToken = createSetupToken();
+    const tokenHash = await hashSetupToken(setupToken);
     const expiresAt = new Date(Date.now() + SETUP_TOKEN_TTL_MS).toISOString();
 
     const { error: updateError } = await admin.auth.admin.updateUserById(userId, {
@@ -88,10 +108,11 @@ serve(async (req: Request) => {
     });
     if (updateError) throw updateError;
 
-    const setupLink = `${appOrigin}/auth?setup_user=${encodeURIComponent(userId)}&setup_token=${encodeURIComponent(token)}`;
+    const setupLink = `${appOrigin}/auth?setup_user=${encodeURIComponent(userId)}&setup_token=${encodeURIComponent(setupToken)}`;
+    await sendSetupEmail(targetUser.user.email, setupLink);
 
     return new Response(JSON.stringify({
-      message: `Setup link created for ${targetUser.user.email}. Copy it and send it to the employee.`,
+      message: `Setup link sent to ${targetUser.user.email}. It was also copied so you can send it manually if needed.`,
       setupLink,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

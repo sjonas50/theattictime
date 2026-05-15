@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { Resend } from 'npm:resend@3.5.0';
 import { corsHeaders } from '../_shared/cors.ts';
 
 console.log("Create User and Employee Edge Function initializing");
@@ -23,6 +24,26 @@ const createSetupToken = () => {
 const hashSetupToken = async (token: string) => {
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
   return bytesToBase64Url(new Uint8Array(hash));
+};
+
+const sendSetupEmail = async (email: string, name: string, setupLink: string) => {
+  const resendApiKey = Deno.env.get('RESEND_API_KEY');
+  if (!resendApiKey) throw new Error('Email service is not configured.');
+
+  const resend = new Resend(resendApiKey);
+  const { error } = await resend.emails.send({
+    from: 'The Attic Time <steve@theattic.ai>',
+    to: [email],
+    subject: 'Set up your The Attic Time password',
+    html: `
+      <p>Hi ${name},</p>
+      <p>Your The Attic Time account is ready. Use this secure link to create your password:</p>
+      <p><a href="${setupLink}">Create your password</a></p>
+      <p>This link expires in 7 days.</p>
+    `,
+  });
+
+  if (error) throw new Error(error.message ?? 'Failed to send setup email.');
 };
 
 const createPasswordSetupLink = async (supabaseAdmin: any, userId: string, appOrigin: string) => {
@@ -162,6 +183,7 @@ serve(async (req: Request) => {
     console.log(`Employee record created successfully for user ID: ${newUserId}`, employeeData);
 
     const setupLink = await createPasswordSetupLink(supabaseAdmin, newUserId, appOrigin);
+    await sendSetupEmail(email, name, setupLink);
 
     console.log(`Attempting to assign 'employee' role to user ID: ${newUserId}`);
     const { error: roleError } = await supabaseAdmin

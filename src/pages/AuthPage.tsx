@@ -269,17 +269,25 @@ const AuthPage = () => {
     }
 
     setForgotPasswordLoading(true);
-    console.log('Sending password reset for:', email);
-    
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth?reset=true`
+    console.log('Sending password setup link for:', email);
+
+    const { error } = await supabase.functions.invoke('request-password-setup', {
+      body: { email },
     });
-    
+
     if (error) {
-      console.error('Password reset error:', error);
-      toast.error(error.message);
+      console.error('Password setup request error:', error);
+      let msg = error.message;
+      try {
+        const ctx = (error as any).context;
+        if (ctx && typeof ctx.json === 'function') {
+          const body = await ctx.clone().json();
+          if (body?.error) msg = body.error;
+        }
+      } catch (_) { /* ignore */ }
+      toast.error(msg);
     } else {
-      toast.success('If an account exists for this email, a password reset link has been sent. Please check your email.');
+      toast.success('If an account exists for this email, a password setup link has been sent. Please check your email.');
     }
     setForgotPasswordLoading(false);
   };
