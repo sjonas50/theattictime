@@ -20,6 +20,7 @@ type EmployeeFormValues = z.infer<typeof employeeFormSchema>;
 
 const CreateEmployeeForm = () => {
   const queryClient = useQueryClient();
+  const [setupLink, setSetupLink] = React.useState('');
   const form = useForm<EmployeeFormValues>({
     resolver: zodResolver(employeeFormSchema),
     defaultValues: {
@@ -67,7 +68,11 @@ const CreateEmployeeForm = () => {
         console.error('Error from edge function (data.error):', responseData.error);
         toast.error(`Failed to create employee: ${responseData.error}`);
       } else if (responseData && responseData.message) {
-        toast.success("Employee invited successfully. They will receive an email to set up their account.");
+        if (responseData.setupLink) {
+          setSetupLink(responseData.setupLink);
+          await navigator.clipboard?.writeText(responseData.setupLink).catch(() => undefined);
+        }
+        toast.success("Employee created. Their setup link has been copied for you to send.");
         form.reset();
         queryClient.invalidateQueries({ queryKey: ['employees_admin'] });
         queryClient.invalidateQueries({ queryKey: ['user_roles_admin'] });
@@ -127,8 +132,19 @@ const CreateEmployeeForm = () => {
           )}
         />
         <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? 'Sending Invite...' : 'Invite Employee & Create User Account'}
+          {form.formState.isSubmitting ? 'Creating Employee...' : 'Create Employee Setup Link'}
         </Button>
+        {setupLink && (
+          <div className="space-y-2 rounded-md border border-border p-3">
+            <FormLabel>Latest setup link</FormLabel>
+            <div className="flex gap-2">
+              <Input value={setupLink} readOnly className="font-mono text-xs" />
+              <Button type="button" variant="outline" onClick={() => navigator.clipboard.writeText(setupLink)}>
+                Copy
+              </Button>
+            </div>
+          </div>
+        )}
       </form>
     </Form>
   );
