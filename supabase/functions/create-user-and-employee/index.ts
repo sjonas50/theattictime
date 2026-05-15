@@ -4,6 +4,53 @@ import { corsHeaders } from '../_shared/cors.ts';
 
 console.log("Create User and Employee Edge Function initializing");
 
+const SETUP_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+const bytesToBase64Url = (bytes: Uint8Array) => {
+  let binary = '';
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+
+const createSetupToken = () => {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return bytesToBase64Url(bytes);
+};
+
+const hashSetupToken = async (token: string) => {
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+  return bytesToBase64Url(new Uint8Array(hash));
+};
+
+const createPasswordSetupLink = async (supabaseAdmin: any, userId: string, appOrigin: string) => {
+  const token = createSetupToken();
+  const tokenHash = await hashSetupToken(token);
+  const expiresAt = new Date(Date.now() + SETUP_TOKEN_TTL_MS).toISOString();
+
+  const { data: userData, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
+  if (getUserError || !userData?.user) {
+    throw new Error(getUserError?.message ?? 'Unable to load user for setup link.');
+  }
+
+  const { error: updateUserError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    email_confirm: true,
+    user_metadata: {
+      ...(userData.user.user_metadata ?? {}),
+      employee_setup_token_hash: tokenHash,
+      employee_setup_token_expires_at: expiresAt,
+    },
+  });
+
+  if (updateUserError) {
+    throw new Error(`Failed to prepare setup link: ${updateUserError.message}`);
+  }
+
+  return `${appOrigin}/auth?setup_user=${encodeURIComponent(userId)}&setup_token=${encodeURIComponent(token)}`;
+};
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
