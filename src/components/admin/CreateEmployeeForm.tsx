@@ -132,7 +132,7 @@ const CreateEmployeeForm = () => {
           )}
         />
         <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? 'Creating Employee...' : 'Create Employee Setup Link'}
+          {form.formState.isSubmitting ? 'Creating Employee...' : 'Create and send setup link'}
         </Button>
         {setupLink && (
           <div className="space-y-2 rounded-md border border-border p-3">
