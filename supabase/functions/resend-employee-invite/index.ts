@@ -2,6 +2,27 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 
+const SETUP_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+const bytesToBase64Url = (bytes: Uint8Array) => {
+  let binary = '';
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+
+const createSetupToken = () => {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return bytesToBase64Url(bytes);
+};
+
+const hashSetupToken = async (token: string) => {
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+  return bytesToBase64Url(new Uint8Array(hash));
+};
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -20,7 +41,6 @@ serve(async (req: Request) => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const admin = createClient(supabaseUrl, serviceRoleKey);
     const appOrigin = req.headers.get('origin') || 'https://theattictime.lovable.app';
-    const passwordSetupRedirectTo = `${appOrigin}/auth?setup=true`;
 
     // Caller must be admin
     const authHeader = req.headers.get('Authorization') ?? '';
@@ -54,31 +74,29 @@ serve(async (req: Request) => {
       });
     }
 
-    const email = targetUser.user.email;
+    const token = createSetupToken();
+    const tokenHash = await hashSetupToken(token);
+    const expiresAt = new Date(Date.now() + SETUP_TOKEN_TTL_MS).toISOString();
 
-    // If user already confirmed, send a password recovery (so they can set password).
-    // Otherwise re-send the invite.
-    const isConfirmed = !!targetUser.user.email_confirmed_at || !!targetUser.user.confirmed_at;
+    const { error: updateError } = await admin.auth.admin.updateUserById(userId, {
+      email_confirm: true,
+      user_metadata: {
+        ...(targetUser.user.user_metadata ?? {}),
+        employee_setup_token_hash: tokenHash,
+        employee_setup_token_expires_at: expiresAt,
+      },
+    });
+    if (updateError) throw updateError;
 
-    if (isConfirmed) {
-      const { error } = await admin.auth.resetPasswordForEmail(email, {
-        redirectTo: passwordSetupRedirectTo,
-      });
-      if (error) throw error;
-      return new Response(JSON.stringify({ message: `Password setup email sent to ${email}.` }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
-    } else {
-      const { error } = await admin.auth.admin.inviteUserByEmail(email, {
-        redirectTo: passwordSetupRedirectTo,
-      });
-      if (error) throw error;
-      return new Response(JSON.stringify({ message: `Invitation re-sent to ${email}.` }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
-    }
+    const setupLink = `${appOrigin}/auth?setup_user=${encodeURIComponent(userId)}&setup_token=${encodeURIComponent(token)}`;
+
+    return new Response(JSON.stringify({
+      message: `Setup link created for ${targetUser.user.email}. Copy it and send it to the employee.`,
+      setupLink,
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    });
   } catch (err: any) {
     console.error('resend-employee-invite error:', err.message);
     return new Response(JSON.stringify({ error: err.message ?? 'Unexpected error' }), {

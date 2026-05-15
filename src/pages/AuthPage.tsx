@@ -17,6 +17,8 @@ const AuthPage = () => {
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [isProcessingAuthLink, setIsProcessingAuthLink] = useState(true);
+  const [setupUserId, setSetupUserId] = useState<string | null>(null);
+  const [setupToken, setSetupToken] = useState<string | null>(null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -25,6 +27,26 @@ const AuthPage = () => {
 
     const process = async () => {
       const url = new URL(window.location.href);
+      const directSetupUser = searchParams.get('setup_user');
+      const directSetupToken = searchParams.get('setup_token');
+
+      if (directSetupUser && directSetupToken) {
+        setSetupUserId(directSetupUser);
+        setSetupToken(directSetupToken);
+        setIsResettingPassword(true);
+        window.history.replaceState({}, document.title, '/auth');
+        toast.info('Please create your password below.');
+        if (isMounted) setIsProcessingAuthLink(false);
+        return;
+      }
+
+      const linkError = searchParams.get('error_code') || searchParams.get('error');
+      if (linkError) {
+        toast.error('This setup link is invalid or expired. Please ask an admin for a new setup link.');
+        window.history.replaceState({}, document.title, '/auth');
+        if (isMounted) setIsProcessingAuthLink(false);
+        return;
+      }
 
       // Detect invite/recovery redirects from Supabase (supports both PKCE code flow and hash tokens)
       const hasSetupFlag = searchParams.get('setup') === 'true' || searchParams.get('reset') === 'true';
@@ -114,8 +136,35 @@ const AuthPage = () => {
     }
     
     setLoading(true);
+
+    if (setupUserId && setupToken) {
+      const { error } = await supabase.functions.invoke('complete-employee-setup', {
+        body: { userId: setupUserId, token: setupToken, password: newPassword },
+      });
+
+      if (error) {
+        let msg = error.message;
+        try {
+          const ctx = (error as any).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const body = await ctx.clone().json();
+            if (body?.error) msg = body.error;
+          }
+        } catch (_) { /* ignore */ }
+        toast.error(msg);
+      } else {
+        toast.success('Password created successfully. You can now sign in.');
+        setSetupUserId(null);
+        setSetupToken(null);
+        setIsResettingPassword(false);
+        navigate('/auth');
+      }
+      setLoading(false);
+      return;
+    }
+
     const { error } = await supabase.auth.updateUser({ password: newPassword });
-    
+
     if (error) {
       toast.error(error.message);
     } else {

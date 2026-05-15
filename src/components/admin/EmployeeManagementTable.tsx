@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Enums, Tables } from '@/integrations/supabase/types';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -32,6 +33,7 @@ const fetchUserRolesAdmin = async (): Promise<UserRoleEntry[]> => {
 const EmployeeManagementTable = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth(); // Get the current authenticated user
+  const [latestSetupLink, setLatestSetupLink] = React.useState('');
 
   const { data: employees, isLoading: isLoadingEmployees, error: employeesError } = useQuery({
     queryKey: ['employees_admin'],
@@ -128,7 +130,11 @@ const EmployeeManagementTable = () => {
       return data;
     },
     onSuccess: (data: any) => {
-      toast.success(data?.message ?? 'Invite re-sent.');
+      if (data?.setupLink) {
+        setLatestSetupLink(data.setupLink);
+        navigator.clipboard?.writeText(data.setupLink).catch(() => undefined);
+      }
+      toast.success(data?.message ?? 'Setup link created.');
     },
     onError: (error: any) => {
       toast.error(`Failed to resend invite: ${error.message}`);
@@ -175,8 +181,17 @@ const EmployeeManagementTable = () => {
   }) || [];
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
+    <div className="space-y-3">
+      {latestSetupLink && (
+        <div className="flex gap-2 rounded-md border border-border p-3">
+          <Input value={latestSetupLink} readOnly className="font-mono text-xs" />
+          <Button type="button" variant="outline" onClick={() => navigator.clipboard.writeText(latestSetupLink)}>
+            Copy
+          </Button>
+        </div>
+      )}
+      <div className="overflow-x-auto">
+        <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
@@ -264,7 +279,8 @@ const EmployeeManagementTable = () => {
             );
           })}
         </TableBody>
-      </Table>
+        </Table>
+      </div>
       {employees?.length === 0 && <p className="text-center py-4">No employees found.</p>}
     </div>
   );

@@ -4,6 +4,53 @@ import { corsHeaders } from '../_shared/cors.ts';
 
 console.log("Create User and Employee Edge Function initializing");
 
+const SETUP_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+const bytesToBase64Url = (bytes: Uint8Array) => {
+  let binary = '';
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+
+const createSetupToken = () => {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return bytesToBase64Url(bytes);
+};
+
+const hashSetupToken = async (token: string) => {
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+  return bytesToBase64Url(new Uint8Array(hash));
+};
+
+const createPasswordSetupLink = async (supabaseAdmin: any, userId: string, appOrigin: string) => {
+  const token = createSetupToken();
+  const tokenHash = await hashSetupToken(token);
+  const expiresAt = new Date(Date.now() + SETUP_TOKEN_TTL_MS).toISOString();
+
+  const { data: userData, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
+  if (getUserError || !userData?.user) {
+    throw new Error(getUserError?.message ?? 'Unable to load user for setup link.');
+  }
+
+  const { error: updateUserError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    email_confirm: true,
+    user_metadata: {
+      ...(userData.user.user_metadata ?? {}),
+      employee_setup_token_hash: tokenHash,
+      employee_setup_token_expires_at: expiresAt,
+    },
+  });
+
+  if (updateUserError) {
+    throw new Error(`Failed to prepare setup link: ${updateUserError.message}`);
+  }
+
+  return `${appOrigin}/auth?setup_user=${encodeURIComponent(userId)}&setup_token=${encodeURIComponent(token)}`;
+};
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -36,7 +83,6 @@ serve(async (req: Request) => {
     
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
     const appOrigin = req.headers.get('origin') || 'https://theattictime.lovable.app';
-    const passwordSetupRedirectTo = `${appOrigin}/auth?setup=true`;
 
     // Check if user already exists
     console.log(`Checking if user already exists for email: ${email}`);
@@ -66,21 +112,11 @@ serve(async (req: Request) => {
 
       console.log(`User exists but has no employee record — creating employee for existing user: ${existingUser.id}`);
       newUserId = existingUser.id;
-
-      // Existing auth user — send a password recovery email so they can set up their account.
-      // inviteUserByEmail would fail because the user already exists.
-      const { error: recoveryError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-        redirectTo: passwordSetupRedirectTo,
-      });
-      if (recoveryError) {
-        console.warn(`Failed to send setup email to existing user ${email}: ${recoveryError.message}`);
-      } else {
-        console.log(`Sent password setup email to existing user: ${email}`);
-      }
     } else {
-      console.log(`Attempting to invite auth user for: ${email}`);
-      const { data: authUserResponse, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-        redirectTo: passwordSetupRedirectTo,
+      console.log(`Attempting to create auth user for: ${email}`);
+      const { data: authUserResponse, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        email_confirm: true,
       });
 
       if (authError) {
@@ -93,7 +129,7 @@ serve(async (req: Request) => {
 
       newUserId = authUserResponse.user.id;
       userWasCreated = true;
-      console.log(`Auth user created successfully (invitation sent): ${newUserId} for email: ${email}`);
+      console.log(`Auth user created successfully: ${newUserId} for email: ${email}`);
     }
 
     console.log(`Attempting to create employee record for user ID: ${newUserId}`);
@@ -125,6 +161,8 @@ serve(async (req: Request) => {
     }
     console.log(`Employee record created successfully for user ID: ${newUserId}`, employeeData);
 
+    const setupLink = await createPasswordSetupLink(supabaseAdmin, newUserId, appOrigin);
+
     console.log(`Attempting to assign 'employee' role to user ID: ${newUserId}`);
     const { error: roleError } = await supabaseAdmin
       .from('user_roles')
@@ -137,9 +175,10 @@ serve(async (req: Request) => {
     }
     
     return new Response(JSON.stringify({ 
-      message: 'Employee invited and user account created successfully. Role assignment attempted. User will receive an invitation email.', 
+      message: 'Employee account created successfully. Share the setup link with the employee so they can create their password.', 
       employee: employeeData,
-      userId: newUserId
+      userId: newUserId,
+      setupLink,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 201,
