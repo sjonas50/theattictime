@@ -27,13 +27,13 @@ const AuthPage = () => {
       const url = new URL(window.location.href);
 
       // Detect invite/recovery redirects from Supabase (supports both PKCE code flow and hash tokens)
-      const hasResetFlag = searchParams.get('reset') === 'true';
+      const hasSetupFlag = searchParams.get('setup') === 'true' || searchParams.get('reset') === 'true';
       const typeParam = searchParams.get('type') || (url.hash.match(/type=([^&]+)/)?.[1] ?? null);
       const hasCode = !!searchParams.get('code');
       const hasAccessToken = url.hash.includes('access_token');
       const isPasswordSetupLink = typeParam === 'recovery' || typeParam === 'invite';
 
-      const shouldProcessPasswordSetup = hasResetFlag || isPasswordSetupLink || hasCode || hasAccessToken;
+      const shouldProcessPasswordSetup = hasSetupFlag || isPasswordSetupLink || hasCode || hasAccessToken;
 
       if (shouldProcessPasswordSetup) {
         setIsResettingPassword(true);
