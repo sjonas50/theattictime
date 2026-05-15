@@ -29,7 +29,8 @@ const AuthPage = () => {
       // Detect invite/recovery redirects from Supabase (supports both PKCE code flow and hash tokens)
       const hasSetupFlag = searchParams.get('setup') === 'true' || searchParams.get('reset') === 'true';
       const typeParam = searchParams.get('type') || (url.hash.match(/type=([^&]+)/)?.[1] ?? null);
-      const hasCode = !!searchParams.get('code');
+      const authCode = searchParams.get('code');
+      const hasCode = !!authCode;
       const hasAccessToken = url.hash.includes('access_token');
       const isPasswordSetupLink = typeParam === 'recovery' || typeParam === 'invite';
 
@@ -38,8 +39,8 @@ const AuthPage = () => {
       if (shouldProcessPasswordSetup) {
         setIsResettingPassword(true);
         try {
-          if (hasCode) {
-            const { error } = await supabase.auth.exchangeCodeForSession(url.toString());
+          if (authCode) {
+            const { error } = await supabase.auth.exchangeCodeForSession(authCode);
             if (error) {
               console.error('exchangeCodeForSession error:', error);
             }
