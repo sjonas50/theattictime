@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Resend } from "npm:resend@3.5.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +13,63 @@ interface SignupRequest {
 }
 
 const ALLOWED_DOMAINS = ['theattic.ai'];
+const SETUP_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+const bytesToBase64Url = (bytes: Uint8Array) => {
+  let binary = '';
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+
+const createSetupToken = () => {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return bytesToBase64Url(bytes);
+};
+
+const hashSetupToken = async (token: string) => {
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+  return bytesToBase64Url(new Uint8Array(hash));
+};
+
+const sendSetupEmail = async (email: string, setupLink: string) => {
+  const resendApiKey = Deno.env.get('RESEND_API_KEY');
+  if (!resendApiKey) throw new Error('Email service is not configured.');
+
+  const resend = new Resend(resendApiKey);
+  const { error } = await resend.emails.send({
+    from: 'The Attic Time <steve@theattic.ai>',
+    to: [email],
+    subject: 'Set up your The Attic Time password',
+    html: `<p>Use this secure link to set your password:</p><p><a href="${setupLink}">Create your password</a></p><p>This link expires in 7 days.</p>`,
+  });
+
+  if (error) throw new Error(error.message ?? 'Failed to send setup email.');
+};
+
+const createPasswordSetupLink = async (supabaseAdmin: any, userId: string, appOrigin: string) => {
+  const token = createSetupToken();
+  const tokenHash = await hashSetupToken(token);
+  const expiresAt = new Date(Date.now() + SETUP_TOKEN_TTL_MS).toISOString();
+
+  const { data: userData, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
+  if (getUserError || !userData?.user) throw new Error(getUserError?.message ?? 'Unable to load user.');
+
+  const { error: updateUserError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    email_confirm: true,
+    user_metadata: {
+      ...(userData.user.user_metadata ?? {}),
+      employee_setup_token_hash: tokenHash,
+      employee_setup_token_expires_at: expiresAt,
+    },
+  });
+
+  if (updateUserError) throw new Error(`Failed to prepare setup link: ${updateUserError.message}`);
+
+  return `${appOrigin}/auth?setup_user=${encodeURIComponent(userId)}&setup_token=${encodeURIComponent(token)}`;
+};
 
 const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
@@ -68,29 +126,9 @@ const handler = async (req: Request): Promise<Response> => {
       // Handle the specific case of user already existing
       if ((error as any).code === 'email_exists' || error.message.includes('already been registered')) {
         try {
-          // Use the configured site URL for redirect
-          const redirectTo = 'https://theattictime.lovable.app/auth?reset=true';
-          const supabasePublic = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY') ?? ''
-          );
-
-          const { error: resetError } = await supabasePublic.auth.resetPasswordForEmail(email, {
-            redirectTo: redirectTo,
-          });
-
-          if (resetError) {
-            console.error('Failed to send password reset email:', resetError);
-            return new Response(
-              JSON.stringify({
-                error: 'An account already exists for this email. Please use "Forgot password" to reset your password.'
-              }),
-              {
-                status: 409, // Conflict status code
-                headers: { 'Content-Type': 'application/json', ...corsHeaders },
-              }
-            );
-          }
+          const appOrigin = req.headers.get('origin') || 'https://theattictime.lovable.app';
+          const setupLink = await createPasswordSetupLink(supabaseAdmin, (error as any).user_id ?? '', appOrigin);
+          await sendSetupEmail(email, setupLink);
 
           return new Response(
             JSON.stringify({
