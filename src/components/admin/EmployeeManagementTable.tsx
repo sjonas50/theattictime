@@ -182,6 +182,9 @@ const EmployeeManagementTable = () => {
 
   return (
     <div className="space-y-3">
+      <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+        Use the setup link controls here for employee access. Supabase dashboard recovery and magic links are one-time links and may be invalidated by email security scanning.
+      </div>
       {latestSetupLink && (
         <div className="flex gap-2 rounded-md border border-border p-3">
           <Input value={latestSetupLink} readOnly className="font-mono text-xs" />
@@ -253,9 +256,9 @@ const EmployeeManagementTable = () => {
                       size="sm"
                       onClick={() => resendInviteMutation.mutate(employee.user_id)}
                       disabled={resendInviteMutation.isPending}
-                      title="Resend invite / password setup email"
+                      title="Send scanner-safe password setup link"
                     >
-                      <Mail className="h-4 w-4 mr-1" /> Resend
+                      <Mail className="h-4 w-4 mr-1" /> Send setup link
                     </Button>
                     <Button
                       variant="destructive"
