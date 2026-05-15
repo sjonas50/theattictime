@@ -7,6 +7,9 @@ project_id = "mpbwlrpzltkhagzgkbxn" # Do not change this line
 [functions.resend-employee-invite]
   verify_jwt = true
 
+[functions.complete-employee-setup]
+  verify_jwt = false
+
 [functions.send-timesheet-reminders]
   verify_jwt = false # Called by pg_cron with anon key
 
