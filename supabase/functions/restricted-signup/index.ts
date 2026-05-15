@@ -71,6 +71,12 @@ const createPasswordSetupLink = async (supabaseAdmin: any, userId: string, appOr
   return `${appOrigin}/auth?setup_user=${encodeURIComponent(userId)}&setup_token=${encodeURIComponent(token)}`;
 };
 
+const findUserByEmail = async (supabaseAdmin: any, email: string) => {
+  const { data, error } = await supabaseAdmin.auth.admin.listUsers();
+  if (error) throw error;
+  return data.users.find((user: any) => user.email?.toLowerCase() === email.toLowerCase()) ?? null;
+};
+
 const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -126,8 +132,11 @@ const handler = async (req: Request): Promise<Response> => {
       // Handle the specific case of user already existing
       if ((error as any).code === 'email_exists' || error.message.includes('already been registered')) {
         try {
+          const existingUser = await findUserByEmail(supabaseAdmin, email);
+          if (!existingUser) throw new Error('Existing account could not be loaded.');
+
           const appOrigin = req.headers.get('origin') || 'https://theattictime.lovable.app';
-          const setupLink = await createPasswordSetupLink(supabaseAdmin, (error as any).user_id ?? '', appOrigin);
+          const setupLink = await createPasswordSetupLink(supabaseAdmin, existingUser.id, appOrigin);
           await sendSetupEmail(email, setupLink);
 
           return new Response(
