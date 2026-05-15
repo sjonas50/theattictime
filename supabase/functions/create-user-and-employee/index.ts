@@ -161,6 +161,8 @@ serve(async (req: Request) => {
     }
     console.log(`Employee record created successfully for user ID: ${newUserId}`, employeeData);
 
+    const setupLink = await createPasswordSetupLink(supabaseAdmin, newUserId, appOrigin);
+
     console.log(`Attempting to assign 'employee' role to user ID: ${newUserId}`);
     const { error: roleError } = await supabaseAdmin
       .from('user_roles')
@@ -173,9 +175,10 @@ serve(async (req: Request) => {
     }
     
     return new Response(JSON.stringify({ 
-      message: 'Employee invited and user account created successfully. Role assignment attempted. User will receive an invitation email.', 
+      message: 'Employee account created successfully. Share the setup link with the employee so they can create their password.', 
       employee: employeeData,
-      userId: newUserId
+      userId: newUserId,
+      setupLink,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 201,
