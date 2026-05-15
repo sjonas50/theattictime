@@ -40,7 +40,7 @@ const sendSetupEmail = async (email: string, setupLink: string) => {
 
   const resend = new Resend(resendApiKey);
   const { error } = await resend.emails.send({
-    from: 'The Attic Time <steve@theattic.ai>',
+    from: 'The Attic Time <onboarding@resend.dev>',
     to: [email],
     subject: 'Set up your The Attic Time password',
     html: `<p>Use this secure link to set your password:</p><p><a href="${setupLink}">Create your password</a></p><p>This link expires in 7 days.</p>`,
