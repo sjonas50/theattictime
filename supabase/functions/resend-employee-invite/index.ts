@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { Resend } from 'npm:resend@3.5.0';
 import { corsHeaders } from '../_shared/cors.ts';
 
 const SETUP_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -21,6 +22,25 @@ const createSetupToken = () => {
 const hashSetupToken = async (token: string) => {
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
   return bytesToBase64Url(new Uint8Array(hash));
+};
+
+const sendSetupEmail = async (email: string, setupLink: string) => {
+  const resendApiKey = Deno.env.get('RESEND_API_KEY');
+  if (!resendApiKey) throw new Error('Email service is not configured.');
+
+  const resend = new Resend(resendApiKey);
+  const { error } = await resend.emails.send({
+    from: 'The Attic Time <steve@theattic.ai>',
+    to: [email],
+    subject: 'Set up your The Attic Time password',
+    html: `
+      <p>Use this secure link to set your The Attic Time password:</p>
+      <p><a href="${setupLink}">Create your password</a></p>
+      <p>This link expires in 7 days.</p>
+    `,
+  });
+
+  if (error) throw new Error(error.message ?? 'Failed to send setup email.');
 };
 
 serve(async (req: Request) => {
@@ -89,9 +109,10 @@ serve(async (req: Request) => {
     if (updateError) throw updateError;
 
     const setupLink = `${appOrigin}/auth?setup_user=${encodeURIComponent(userId)}&setup_token=${encodeURIComponent(token)}`;
+    await sendSetupEmail(targetUser.user.email, setupLink);
 
     return new Response(JSON.stringify({
-      message: `Setup link created for ${targetUser.user.email}. Copy it and send it to the employee.`,
+      message: `Setup link sent to ${targetUser.user.email}. It was also copied so you can send it manually if needed.`,
       setupLink,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
