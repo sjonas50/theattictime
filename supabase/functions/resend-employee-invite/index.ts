@@ -19,6 +19,8 @@ serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const admin = createClient(supabaseUrl, serviceRoleKey);
+    const appOrigin = req.headers.get('origin') || 'https://theattictime.lovable.app';
+    const passwordSetupRedirectTo = `${appOrigin}/auth?setup=true`;
 
     // Caller must be admin
     const authHeader = req.headers.get('Authorization') ?? '';
@@ -59,14 +61,18 @@ serve(async (req: Request) => {
     const isConfirmed = !!targetUser.user.email_confirmed_at || !!targetUser.user.confirmed_at;
 
     if (isConfirmed) {
-      const { error } = await admin.auth.resetPasswordForEmail(email);
+      const { error } = await admin.auth.resetPasswordForEmail(email, {
+        redirectTo: passwordSetupRedirectTo,
+      });
       if (error) throw error;
       return new Response(JSON.stringify({ message: `Password setup email sent to ${email}.` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
     } else {
-      const { error } = await admin.auth.admin.inviteUserByEmail(email);
+      const { error } = await admin.auth.admin.inviteUserByEmail(email, {
+        redirectTo: passwordSetupRedirectTo,
+      });
       if (error) throw error;
       return new Response(JSON.stringify({ message: `Invitation re-sent to ${email}.` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

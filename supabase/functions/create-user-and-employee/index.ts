@@ -35,6 +35,8 @@ serve(async (req: Request) => {
     }
     
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+    const appOrigin = req.headers.get('origin') || 'https://theattictime.lovable.app';
+    const passwordSetupRedirectTo = `${appOrigin}/auth?setup=true`;
 
     // Check if user already exists
     console.log(`Checking if user already exists for email: ${email}`);
@@ -67,7 +69,9 @@ serve(async (req: Request) => {
 
       // Existing auth user — send a password recovery email so they can set up their account.
       // inviteUserByEmail would fail because the user already exists.
-      const { error: recoveryError } = await supabaseAdmin.auth.resetPasswordForEmail(email);
+      const { error: recoveryError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+        redirectTo: passwordSetupRedirectTo,
+      });
       if (recoveryError) {
         console.warn(`Failed to send setup email to existing user ${email}: ${recoveryError.message}`);
       } else {
@@ -75,7 +79,9 @@ serve(async (req: Request) => {
       }
     } else {
       console.log(`Attempting to invite auth user for: ${email}`);
-      const { data: authUserResponse, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email);
+      const { data: authUserResponse, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+        redirectTo: passwordSetupRedirectTo,
+      });
 
       if (authError) {
         console.error('Error creating auth user:', authError.message);

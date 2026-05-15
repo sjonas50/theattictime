@@ -16,46 +16,72 @@ const AuthPage = () => {
   const [loading, setLoading] = useState(false);
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [isProcessingAuthLink, setIsProcessingAuthLink] = useState(true);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
+    let isMounted = true;
+
     const process = async () => {
       const url = new URL(window.location.href);
 
-      // Detect recovery redirect from Supabase (supports both new code flow and hash tokens)
-      const hasResetFlag = searchParams.get('reset') === 'true';
+      // Detect invite/recovery redirects from Supabase (supports both PKCE code flow and hash tokens)
+      const hasSetupFlag = searchParams.get('setup') === 'true' || searchParams.get('reset') === 'true';
       const typeParam = searchParams.get('type') || (url.hash.match(/type=([^&]+)/)?.[1] ?? null);
-      const hasCode = !!searchParams.get('code');
+      const authCode = searchParams.get('code');
+      const hasCode = !!authCode;
       const hasAccessToken = url.hash.includes('access_token');
-      const isRecovery = typeParam === 'recovery';
+      const isPasswordSetupLink = typeParam === 'recovery' || typeParam === 'invite';
 
-      const shouldProcessRecovery = hasResetFlag || isRecovery || hasCode || hasAccessToken;
+      const shouldProcessPasswordSetup = hasSetupFlag || isPasswordSetupLink || hasCode || hasAccessToken;
 
-      if (shouldProcessRecovery) {
+      if (shouldProcessPasswordSetup) {
         setIsResettingPassword(true);
         try {
-          // Supabase v2 PKCE: exchange the code/hash for a session
-          const { data, error } = await supabase.auth.exchangeCodeForSession(url.toString());
-          if (error) {
-            console.error('exchangeCodeForSession error:', error);
+          if (authCode) {
+            const { error } = await supabase.auth.exchangeCodeForSession(authCode);
+            if (error) {
+              console.error('exchangeCodeForSession error:', error);
+            }
           }
 
           const { data: sessionData } = await supabase.auth.getSession();
-          const session = sessionData.session;
+          let session = sessionData.session;
+
+          if (!session && hasAccessToken) {
+            const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
+            const accessToken = hashParams.get('access_token');
+            const refreshToken = hashParams.get('refresh_token');
+
+            if (accessToken && refreshToken) {
+              const { data, error } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken,
+              });
+
+              if (error) {
+                console.error('setSession error:', error);
+              }
+              session = data.session;
+            }
+          }
 
           if (!session) {
-            toast.error('Password reset link is invalid or expired. Please request a new one.');
+            toast.error('This setup link is invalid or expired. Please ask an admin to resend it.');
             setIsResettingPassword(false);
           } else {
-            toast.info('Please enter your new password below.');
+            window.history.replaceState({}, document.title, '/auth');
+            toast.info('Please create your password below.');
           }
         } catch (err) {
-          console.error('Recovery processing error:', err);
-          toast.error('Failed to process recovery link. Please try again.');
+          console.error('Password setup processing error:', err);
+          toast.error('Failed to process setup link. Please try again.');
           setIsResettingPassword(false);
+        } finally {
+          if (isMounted) setIsProcessingAuthLink(false);
         }
-        return; // Skip normal redirect logic during recovery
+        return; // Skip normal redirect logic during password setup
       }
 
       // Check if user is already logged in and redirect them
@@ -64,9 +90,14 @@ const AuthPage = () => {
         console.log('User already logged in, redirecting to home');
         navigate('/');
       }
+      if (isMounted) setIsProcessingAuthLink(false);
     };
 
     process();
+
+    return () => {
+      isMounted = false;
+    };
   }, [searchParams, navigate]);
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
@@ -88,7 +119,8 @@ const AuthPage = () => {
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success('Password updated successfully! You can now sign in with your new password.');
+      toast.success('Password created successfully. You can now sign in.');
+      await supabase.auth.signOut();
       setIsResettingPassword(false);
       navigate('/auth');
     }
@@ -136,7 +168,7 @@ const AuthPage = () => {
         setEmail('');
         setPassword('');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Signup error:', error);
       toast.error('An unexpected error occurred. Please try again.');
     }
@@ -203,14 +235,27 @@ const AuthPage = () => {
     setForgotPasswordLoading(false);
   };
 
-  // Show password reset form if user came from reset link
+  if (isProcessingAuthLink) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-[400px] max-w-full">
+          <CardHeader>
+            <CardTitle>Checking secure link</CardTitle>
+            <CardDescription>Please wait while we prepare your account setup.</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show password setup form if user came from invite or reset link
   if (isResettingPassword) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-        <Card className="w-[400px]">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-[400px] max-w-full">
           <CardHeader>
-            <CardTitle>Reset Password</CardTitle>
-            <CardDescription>Enter your new password below.</CardDescription>
+            <CardTitle>Create Password</CardTitle>
+            <CardDescription>Set your password to finish account setup.</CardDescription>
           </CardHeader>
           <form onSubmit={handlePasswordUpdate}>
             <CardContent className="space-y-4">
@@ -241,7 +286,7 @@ const AuthPage = () => {
             </CardContent>
             <CardFooter>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Updating Password...' : 'Update Password'}
+                {loading ? 'Saving Password...' : 'Save Password'}
               </Button>
             </CardFooter>
           </form>
@@ -251,8 +296,8 @@ const AuthPage = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-      <Tabs defaultValue="signin" className="w-[400px]">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Tabs defaultValue="signin" className="w-[400px] max-w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="signin">Sign In</TabsTrigger>
           <TabsTrigger value="signup">Sign Up</TabsTrigger>
