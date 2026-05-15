@@ -141,7 +141,7 @@ const handler = async (req: Request): Promise<Response> => {
 
           return new Response(
             JSON.stringify({
-              message: 'An account already exists. A password reset link has been sent to your email if it is valid.'
+              message: 'An account already exists. A password setup link has been sent to your email if it is valid.'
             }),
             {
               status: 200,
@@ -152,7 +152,7 @@ const handler = async (req: Request): Promise<Response> => {
           console.error('Error while handling existing user case:', existingUserError);
           return new Response(
             JSON.stringify({
-              error: 'Account exists. Please use "Forgot password" to reset your password.'
+              error: 'Account exists. Please use "Forgot password" to get a password setup link.'
             }),
             {
               status: 409,
