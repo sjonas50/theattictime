@@ -46,7 +46,7 @@ const AuthPage = () => {
             }
           }
 
-          let { data: sessionData } = await supabase.auth.getSession();
+          const { data: sessionData } = await supabase.auth.getSession();
           let session = sessionData.session;
 
           if (!session && hasAccessToken) {
@@ -168,7 +168,7 @@ const AuthPage = () => {
         setEmail('');
         setPassword('');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Signup error:', error);
       toast.error('An unexpected error occurred. Please try again.');
     }
