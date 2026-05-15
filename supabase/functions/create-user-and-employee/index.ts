@@ -83,7 +83,6 @@ serve(async (req: Request) => {
     
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
     const appOrigin = req.headers.get('origin') || 'https://theattictime.lovable.app';
-    const passwordSetupRedirectTo = `${appOrigin}/auth?setup=true`;
 
     // Check if user already exists
     console.log(`Checking if user already exists for email: ${email}`);
@@ -113,21 +112,11 @@ serve(async (req: Request) => {
 
       console.log(`User exists but has no employee record — creating employee for existing user: ${existingUser.id}`);
       newUserId = existingUser.id;
-
-      // Existing auth user — send a password recovery email so they can set up their account.
-      // inviteUserByEmail would fail because the user already exists.
-      const { error: recoveryError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-        redirectTo: passwordSetupRedirectTo,
-      });
-      if (recoveryError) {
-        console.warn(`Failed to send setup email to existing user ${email}: ${recoveryError.message}`);
-      } else {
-        console.log(`Sent password setup email to existing user: ${email}`);
-      }
     } else {
-      console.log(`Attempting to invite auth user for: ${email}`);
-      const { data: authUserResponse, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-        redirectTo: passwordSetupRedirectTo,
+      console.log(`Attempting to create auth user for: ${email}`);
+      const { data: authUserResponse, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        email_confirm: true,
       });
 
       if (authError) {
@@ -140,7 +129,7 @@ serve(async (req: Request) => {
 
       newUserId = authUserResponse.user.id;
       userWasCreated = true;
-      console.log(`Auth user created successfully (invitation sent): ${newUserId} for email: ${email}`);
+      console.log(`Auth user created successfully: ${newUserId} for email: ${email}`);
     }
 
     console.log(`Attempting to create employee record for user ID: ${newUserId}`);
