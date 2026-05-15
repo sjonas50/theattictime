@@ -45,8 +45,26 @@ const AuthPage = () => {
             }
           }
 
-          const { data: sessionData } = await supabase.auth.getSession();
-          const session = sessionData.session;
+          let { data: sessionData } = await supabase.auth.getSession();
+          let session = sessionData.session;
+
+          if (!session && hasAccessToken) {
+            const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
+            const accessToken = hashParams.get('access_token');
+            const refreshToken = hashParams.get('refresh_token');
+
+            if (accessToken && refreshToken) {
+              const { data, error } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken,
+              });
+
+              if (error) {
+                console.error('setSession error:', error);
+              }
+              session = data.session;
+            }
+          }
 
           if (!session) {
             toast.error('This setup link is invalid or expired. Please ask an admin to resend it.');
