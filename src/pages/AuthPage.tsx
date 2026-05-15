@@ -100,7 +100,8 @@ const AuthPage = () => {
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success('Password updated successfully! You can now sign in with your new password.');
+      toast.success('Password created successfully. You can now sign in.');
+      await supabase.auth.signOut();
       setIsResettingPassword(false);
       navigate('/auth');
     }
@@ -215,14 +216,27 @@ const AuthPage = () => {
     setForgotPasswordLoading(false);
   };
 
-  // Show password reset form if user came from reset link
+  if (isProcessingAuthLink) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-[400px] max-w-full">
+          <CardHeader>
+            <CardTitle>Checking secure link</CardTitle>
+            <CardDescription>Please wait while we prepare your account setup.</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show password setup form if user came from invite or reset link
   if (isResettingPassword) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-        <Card className="w-[400px]">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-[400px] max-w-full">
           <CardHeader>
-            <CardTitle>Reset Password</CardTitle>
-            <CardDescription>Enter your new password below.</CardDescription>
+            <CardTitle>Create Password</CardTitle>
+            <CardDescription>Set your password to finish account setup.</CardDescription>
           </CardHeader>
           <form onSubmit={handlePasswordUpdate}>
             <CardContent className="space-y-4">
@@ -253,7 +267,7 @@ const AuthPage = () => {
             </CardContent>
             <CardFooter>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Updating Password...' : 'Update Password'}
+                {loading ? 'Saving Password...' : 'Save Password'}
               </Button>
             </CardFooter>
           </form>
@@ -263,8 +277,8 @@ const AuthPage = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-      <Tabs defaultValue="signin" className="w-[400px]">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Tabs defaultValue="signin" className="w-[400px] max-w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="signin">Sign In</TabsTrigger>
           <TabsTrigger value="signup">Sign Up</TabsTrigger>
