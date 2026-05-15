@@ -181,8 +181,17 @@ const EmployeeManagementTable = () => {
   }) || [];
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
+    <div className="space-y-3">
+      {latestSetupLink && (
+        <div className="flex gap-2 rounded-md border border-border p-3">
+          <Input value={latestSetupLink} readOnly className="font-mono text-xs" />
+          <Button type="button" variant="outline" onClick={() => navigator.clipboard.writeText(latestSetupLink)}>
+            Copy
+          </Button>
+        </div>
+      )}
+      <div className="overflow-x-auto">
+        <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
@@ -270,7 +279,8 @@ const EmployeeManagementTable = () => {
             );
           })}
         </TableBody>
-      </Table>
+        </Table>
+      </div>
       {employees?.length === 0 && <p className="text-center py-4">No employees found.</p>}
     </div>
   );
