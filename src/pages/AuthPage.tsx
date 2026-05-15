@@ -136,8 +136,35 @@ const AuthPage = () => {
     }
     
     setLoading(true);
+
+    if (setupUserId && setupToken) {
+      const { error } = await supabase.functions.invoke('complete-employee-setup', {
+        body: { userId: setupUserId, token: setupToken, password: newPassword },
+      });
+
+      if (error) {
+        let msg = error.message;
+        try {
+          const ctx = (error as any).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const body = await ctx.clone().json();
+            if (body?.error) msg = body.error;
+          }
+        } catch (_) { /* ignore */ }
+        toast.error(msg);
+      } else {
+        toast.success('Password created successfully. You can now sign in.');
+        setSetupUserId(null);
+        setSetupToken(null);
+        setIsResettingPassword(false);
+        navigate('/auth');
+      }
+      setLoading(false);
+      return;
+    }
+
     const { error } = await supabase.auth.updateUser({ password: newPassword });
-    
+
     if (error) {
       toast.error(error.message);
     } else {
